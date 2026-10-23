@@ -1,0 +1,765 @@
+{
+ "version": 1,
+ "title": "맹수는 정말 범인이었을까",
+ "sentences": [
+  {
+   "n": 1,
+   "en": "In the complex story of nature's ways, people exploring the wild's twisting paths often discover themselves caught in dangerous situations.",
+   "ko": "자연의 섭리라는 복잡한 이야기 속에서, 야생의 구불구불한 길을 탐험하는 사람들은 종종 자신이 위험한 상황에 처해 있음을 발견한다.",
+   "marks": [
+    {
+     "id": "1a",
+     "type": "box",
+     "text": "In the complex story of nature's ways",
+     "label": "전치사구"
+    },
+    {
+     "id": "1b",
+     "type": "under",
+     "text": "people",
+     "label": "S"
+    },
+    {
+     "id": "1c",
+     "type": "box",
+     "text": "exploring the wild's twisting paths",
+     "label": "현재분사"
+    },
+    {
+     "id": "1d",
+     "type": "arrow",
+     "text": "exploring the wild's twisting paths",
+     "to": "people"
+    },
+    {
+     "id": "1e",
+     "type": "under",
+     "text": "discover",
+     "label": "V"
+    },
+    {
+     "id": "1f",
+     "type": "under",
+     "text": "themselves",
+     "label": "O",
+     "note": "them ✕"
+    },
+    {
+     "id": "1g",
+     "type": "under",
+     "text": "caught",
+     "label": "O.C",
+     "note": "catching ✕"
+    }
+   ]
+  },
+  {
+   "n": 2,
+   "en": "Bears, cougars, and other wild animals sometimes remind us of their formidable presence.",
+   "ko": "곰, 퓨마, 그리고 다른 야생 동물들은 때때로 우리에게 그들의 가공할 만한 존재감을 상기시킨다.",
+   "marks": [
+    {
+     "id": "2a",
+     "type": "under",
+     "text": "Bears, cougars, and other wild animals",
+     "label": "S"
+    },
+    {
+     "id": "2b",
+     "type": "under",
+     "text": "remind",
+     "label": "V",
+     "note": "remind A of B"
+    },
+    {
+     "id": "2c",
+     "type": "under",
+     "text": "us",
+     "label": "O"
+    },
+    {
+     "id": "2d",
+     "type": "box",
+     "text": "of their formidable presence"
+    },
+    {
+     "id": "2e",
+     "type": "note",
+     "text": "formidable",
+     "note": "=fearsome"
+    },
+    {
+     "id": "2f",
+     "type": "box",
+     "on": "ko",
+     "text": "가공할 만한",
+     "color": "red"
+    }
+   ]
+  },
+  {
+   "n": 3,
+   "en": "Despite the infrequency, there are a considerable number of accumulated instances where these guardians of the wilderness become aggressors, resulting in tragic outcomes for unsuspecting explorers.",
+   "ko": "드물기는 하지만, 이 황야의 수호자들이 공격자가 되어 아무것도 모르는 탐험가들에게 비극적인 결과를 초래한 사례가 상당수 축적되어 있다.",
+   "marks": [
+    {
+     "id": "3i",
+     "type": "box",
+     "text": "Despite the infrequency",
+     "label": "문두 부사구"
+    },
+    {
+     "id": "3a",
+     "type": "hl",
+     "text": "Despite",
+     "note": "Although ✕"
+    },
+    {
+     "id": "3b",
+     "type": "under",
+     "text": "are",
+     "label": "V",
+     "note": "is ✕"
+    },
+    {
+     "id": "3c",
+     "type": "under",
+     "text": "a considerable number of accumulated instances",
+     "label": "S"
+    },
+    {
+     "id": "3d",
+     "type": "box",
+     "text": "where these guardians of the wilderness become aggressors",
+     "label": "관계부사절",
+     "note": "which ✕"
+    },
+    {
+     "id": "3e",
+     "type": "arrow",
+     "text": "where these",
+     "to": "instances"
+    },
+    {
+     "id": "3f",
+     "type": "note",
+     "text": "guardians",
+     "note": "=맹수들"
+    },
+    {
+     "id": "3g",
+     "type": "under",
+     "text": "become aggressors",
+     "color": "red"
+    },
+    {
+     "id": "3h",
+     "type": "box",
+     "text": "resulting in tragic outcomes for unsuspecting explorers",
+     "label": "분사구문(결과)"
+    }
+   ]
+  },
+  {
+   "n": 4,
+   "en": "Yet amid these serious situations, a remarkable turn of events occurs, like unexpected notes in a familiar song.",
+   "ko": "그러나 이러한 심각한 상황 속에서, 익숙한 노래 속의 예상치 못한 음표처럼 놀라운 반전이 일어난다.",
+   "marks": [
+    {
+     "id": "4a",
+     "type": "box",
+     "text": "Yet",
+     "note": "흐름 반전!"
+    },
+    {
+     "id": "4b",
+     "type": "box",
+     "text": "amid these serious situations",
+     "label": "~의 한가운데"
+    },
+    {
+     "id": "4c",
+     "type": "under",
+     "text": "a remarkable turn of events",
+     "label": "S"
+    },
+    {
+     "id": "4d",
+     "type": "under",
+     "text": "occurs",
+     "label": "V",
+     "note": "is occurred ✕"
+    },
+    {
+     "id": "4e",
+     "type": "box",
+     "text": "like unexpected notes in a familiar song",
+     "label": "비유"
+    }
+   ]
+  },
+  {
+   "n": 5,
+   "en": "In Oregon's forests in 1995, a man was found dead, initially blamed on a cougar, but subsequent investigation revealed otherwise.",
+   "ko": "1995년 오리건주의 숲에서 한 남자가 죽은 채로 발견되었는데, 처음에는 퓨마의 탓으로 여겨졌지만 이후의 조사는 그렇지 않다는 것을 밝혀냈다.",
+   "marks": [
+    {
+     "id": "5a",
+     "type": "box",
+     "text": "In Oregon's forests in 1995",
+     "label": "사례 ①"
+    },
+    {
+     "id": "5b",
+     "type": "under",
+     "text": "a man",
+     "label": "S"
+    },
+    {
+     "id": "5c",
+     "type": "under",
+     "text": "was found",
+     "label": "V",
+     "note": "수동태"
+    },
+    {
+     "id": "5d",
+     "type": "under",
+     "text": "dead",
+     "label": "C",
+     "note": "died ✕"
+    },
+    {
+     "id": "5e",
+     "type": "box",
+     "text": "initially blamed on a cougar",
+     "label": "분사구문(수동)",
+     "note": "blame A on B"
+    },
+    {
+     "id": "5f",
+     "type": "triangle",
+     "text": "but"
+    },
+    {
+     "id": "5g",
+     "type": "under",
+     "text": "subsequent investigation",
+     "label": "S"
+    },
+    {
+     "id": "5h",
+     "type": "under",
+     "text": "revealed",
+     "label": "V"
+    },
+    {
+     "id": "5i",
+     "type": "under",
+     "text": "otherwise",
+     "label": "O",
+     "note": "그렇지 않다는 것"
+    }
+   ]
+  },
+  {
+   "n": 6,
+   "en": "Similarly, in 2015, a comparable incident occurred, with initial suspicions falling on a nearby wolf pack.",
+   "ko": "마찬가지로 2015년에도 비슷한 사건이 일어났는데, 처음의 의혹은 근처의 늑대 무리에게 쏠렸다.",
+   "marks": [
+    {
+     "id": "6a",
+     "type": "box",
+     "text": "Similarly",
+     "note": "사례 추가"
+    },
+    {
+     "id": "6b",
+     "type": "under",
+     "text": "a comparable incident",
+     "label": "S",
+     "note": "comparative ✕"
+    },
+    {
+     "id": "6c",
+     "type": "under",
+     "text": "occurred",
+     "label": "V"
+    },
+    {
+     "id": "6d",
+     "type": "box",
+     "text": "with initial suspicions falling on a nearby wolf pack",
+     "label": "with + O + -ing",
+     "note": "fallen ✕"
+    }
+   ]
+  },
+  {
+   "n": 7,
+   "en": "However, upon closer investigation, it became apparent that the wolves were innocent bystanders in the man's tragic fate, emphasizing the complexity inherent in such wilderness tragedies.",
+   "ko": "하지만 더 면밀히 조사하자, 늑대들은 그 남자의 비극적인 운명에서 무고한 구경꾼이었다는 것이 분명해졌고, 이는 그러한 야생의 비극들에 내재된 복잡성을 강조한다.",
+   "marks": [
+    {
+     "id": "7a",
+     "type": "box",
+     "text": "However"
+    },
+    {
+     "id": "7b",
+     "type": "box",
+     "text": "upon closer investigation",
+     "note": "upon -ing/명사: ~하자마자"
+    },
+    {
+     "id": "7c",
+     "type": "under",
+     "text": "it",
+     "occ": 1,
+     "label": "가S"
+    },
+    {
+     "id": "7d",
+     "type": "under",
+     "text": "became apparent",
+     "label": "V"
+    },
+    {
+     "id": "7f",
+     "type": "box",
+     "text": "that the wolves were innocent bystanders in the man's tragic fate",
+     "label": "진S",
+     "color": "blue"
+    },
+    {
+     "id": "7g",
+     "type": "hl",
+     "text": "innocent bystanders"
+    },
+    {
+     "id": "7h",
+     "type": "box",
+     "text": "emphasizing the complexity inherent in such wilderness tragedies",
+     "label": "분사구문(결과)",
+     "note": "emphasized ✕"
+    }
+   ]
+  }
+ ],
+ "summary": [
+  {
+   "id": "sum1",
+   "k": "제목",
+   "v": "The Hidden Complexity of Wilderness Tragedies (야생 비극에 숨은 복잡성)"
+  },
+  {
+   "id": "sum2",
+   "k": "주제",
+   "v": "the complexity behind wilderness tragedies blamed on wild animals (야생동물 탓으로 여겨진 야생 비극의 복잡성)"
+  },
+  {
+   "id": "sum3",
+   "k": "요지",
+   "v": "Wilderness tragedies are more complex than they first appear (야생의 비극은 처음 보이는 것보다 복잡하다)"
+  },
+  {
+   "id": "sum4",
+   "k": "도입",
+   "v": "야생 탐험객은 위험에 처하고, 드물지만 맹수가 공격자가 된 사례도 쌓여 있다"
+  },
+  {
+   "id": "sum5",
+   "k": "반전 사례 1",
+   "v": "1995년 오리건, 퓨마 탓으로 여겼지만 조사 결과 아니었음"
+  },
+  {
+   "id": "sum6",
+   "k": "반전 사례 2",
+   "v": "2015년, 늑대 무리를 의심했지만 무고한 구경꾼이었음"
+  },
+  {
+   "id": "sum7",
+   "k": "결론",
+   "v": "이런 사례들은 야생 비극에 내재된 복잡성을 보여 준다"
+  }
+ ],
+ "memo": [
+  {
+   "id": "memo1",
+   "text": "① 도입: 야생 탐험은 위험하고, 맹수가 공격한 사례도 쌓여 있다 (1~3문장)"
+  },
+  {
+   "id": "memo2",
+   "text": "② Yet 반전: 1995년 퓨마, 2015년 늑대 무리를 의심했지만 둘 다 범인이 아니었다 (4~7문장)"
+  },
+  {
+   "id": "memo3",
+   "text": "③ 결론: 야생의 비극은 겉보기보다 복잡하다 (7문장)"
+  },
+  {
+   "id": "memo4",
+   "text": "어법 포인트: caught (catching ✕) · are (is ✕) · where (which ✕) · occurs (is occurred ✕) · falling (fallen ✕)",
+   "tone": "blue"
+  },
+  {
+   "id": "memo5",
+   "text": "유의어: formidable ≈ fearsome · comparable ≈ similar · subsequent ≈ later   반의어: infrequency ↔ frequency",
+   "tone": "green"
+  }
+ ],
+ "vocab": [
+  {
+   "id": "v1",
+   "en": "formidable",
+   "ko": "가공할 만한, 무시무시한"
+  },
+  {
+   "id": "v2",
+   "en": "infrequency",
+   "ko": "드묾, 빈도가 낮음"
+  },
+  {
+   "id": "v3",
+   "en": "a considerable number of",
+   "ko": "상당수의"
+  },
+  {
+   "id": "v4",
+   "en": "accumulated",
+   "ko": "축적된, 쌓인"
+  },
+  {
+   "id": "v5",
+   "en": "aggressor",
+   "ko": "공격자"
+  },
+  {
+   "id": "v6",
+   "en": "unsuspecting",
+   "ko": "아무것도 모르는"
+  },
+  {
+   "id": "v7",
+   "en": "subsequent",
+   "ko": "그 이후의, 뒤이은"
+  },
+  {
+   "id": "v8",
+   "en": "comparable",
+   "ko": "비슷한, 비교할 만한"
+  },
+  {
+   "id": "v9",
+   "en": "bystander",
+   "ko": "구경꾼, 방관자"
+  },
+  {
+   "id": "v10",
+   "en": "inherent",
+   "ko": "내재된, 고유한"
+  }
+ ],
+ "practice": {
+  "grammar": [
+   {
+    "n": 1,
+    "q": "People exploring the wild's twisting paths often discover themselves (caught / catching) in dangerous situations.",
+    "a": "caught",
+    "why": "discover O O.C 구조. themselves가 위험한 상황에 '처한(잡힌)' 것이라 수동 관계의 과거분사."
+   },
+   {
+    "n": 3,
+    "q": "There (is / are) a considerable number of accumulated instances.",
+    "a": "are",
+    "why": "a number of + 복수명사는 복수 취급. the number of였다면 단수."
+   },
+   {
+    "n": 3,
+    "q": "instances (where / which) these guardians of the wilderness become aggressors",
+    "a": "where",
+    "why": "뒤 문장이 완전한 2형식(S+V+C)이므로 관계부사 where."
+   },
+   {
+    "n": 4,
+    "q": "A remarkable turn of events (occurs / is occurred).",
+    "a": "occurs",
+    "why": "occur는 자동사라서 수동태로 쓸 수 없다."
+   },
+   {
+    "n": 6,
+    "q": "with initial suspicions (falling / fallen) on a nearby wolf pack",
+    "a": "falling",
+    "why": "suspicions가 '쏠리는' 능동 관계. fall은 자동사라 과거분사 수동 불가."
+   }
+  ],
+  "blanks": [
+   {
+    "n": 2,
+    "q": "Bears, cougars, and other wild animals sometimes remind us ____ their formidable presence.",
+    "a": "of"
+   },
+   {
+    "n": 5,
+    "q": "a man was found dead, initially ____ on a cougar",
+    "a": "blamed"
+   },
+   {
+    "n": 7,
+    "q": "____ closer investigation, it became apparent that the wolves were innocent bystanders",
+    "a": "upon"
+   }
+  ]
+ },
+ "steps": [
+  {
+   "view": "intro",
+   "say": "안녕, 여러분! 오늘은 올림포스 영어독해 기본 1, 18번 지문을 같이 볼 거야. 제목은 맹수는 정말 범인이었을까. 야생에서 사람이 다치거나 죽으면 우리는 보통 곰이나 퓨마 같은 맹수를 먼저 떠올리잖아. 그런데 이 글은 그게 꼭 그렇지만은 않다는 이야기를 해."
+  },
+  {
+   "view": "summary",
+   "say": "자, 본문을 보기 전에 이 글이 어떤 내용인지 전체를 먼저 정리해 볼게. 제목은 The Hidden Complexity of Wilderness Tragedies, 야생 비극에 숨은 복잡성이야. 주제는 야생동물 탓으로 여겨진 비극 뒤에 숨은 복잡성이고, 요지는 야생의 비극은 처음 보이는 것보다 복잡하다는 거야.",
+   "show": [
+    "sum1",
+    "sum2",
+    "sum3"
+   ]
+  },
+  {
+   "view": "summary",
+   "say": "흐름도 같이 보자. 도입에서는 야생이 위험하고, 드물지만 맹수가 공격한 사례도 있다고 말해. 그다음에 반전 사례가 두 개 나와. 1995년에는 퓨마, 2015년에는 늑대 무리가 의심을 받았는데 조사해 보니 둘 다 범인이 아니었어. 그래서 결론은 이런 비극은 생각보다 복잡하다는 거지.",
+   "show": [
+    "sum4",
+    "sum5",
+    "sum6",
+    "sum7"
+   ]
+  },
+  {
+   "view": "sentence",
+   "n": 1,
+   "say": "첫 문장 보자. In the complex story of nature's ways, 자연의 섭리라는 복잡한 이야기 속에서. 이건 전치사구라서 문장의 뼈대가 아니야. 진짜 주어는 people이고, 바로 뒤에 exploring the wild's twisting paths가 people을 뒤에서 꾸며 줘. 야생의 구불구불한 길을 탐험하는 사람들, 이렇게.",
+   "show": [
+    "1a",
+    "1b",
+    "1c",
+    "1d"
+   ]
+  },
+  {
+   "view": "sentence",
+   "n": 1,
+   "say": "동사는 discover야. discover 다음에 목적어 themselves, 그리고 목적격 보어 caught가 와. 주어 people과 목적어가 같은 사람이니까 them이 아니라 재귀대명사 themselves를 써야 하고, 자신이 위험한 상황에 처한, 즉 잡힌 거니까 catching이 아니라 과거분사 caught가 맞아. 어법 문제로 정말 자주 나오는 자리야.",
+   "show": [
+    "1e",
+    "1f",
+    "1g"
+   ]
+  },
+  {
+   "view": "sentence",
+   "n": 2,
+   "say": "{호명}, 이 문장은 시험에 진짜 잘 나와. 두 번째 문장. 주어는 Bears, cougars, and other wild animals, 곰, 퓨마, 그리고 다른 야생 동물들. 동사는 remind야. remind A of B, A에게 B를 상기시키다. 그래서 us가 A, of their formidable presence가 B가 돼.",
+   "show": [
+    "2a",
+    "2b",
+    "2c",
+    "2d"
+   ]
+  },
+  {
+   "view": "sentence",
+   "n": 2,
+   "say": "formidable은 가공할 만한, 무시무시한이라는 뜻이야. fearsome이랑 바꿔 쓸 수 있어. 해석에서도 가공할 만한 존재감, 이 부분을 꼭 체크해 둬.",
+   "show": [
+    "2e",
+    "2f"
+   ]
+  },
+  {
+   "view": "sentence",
+   "n": 3,
+   "say": "세 번째 문장. 먼저 Despite 보이지? 뒤에 the infrequency라는 명사가 오니까 전치사 Despite가 맞아. Although는 접속사라서 뒤에 주어와 동사가 와야 하거든. 그리고 there are 구문이니까 진짜 주어는 뒤에 있는 a considerable number of accumulated instances야. 복수니까 is가 아니라 are.",
+   "show": [
+    "3i",
+    "3a",
+    "3b",
+    "3c"
+   ]
+  },
+  {
+   "view": "sentence",
+   "n": 3,
+   "say": "instances 뒤에 where가 이끄는 절이 instances를 꾸며 줘. where 뒤를 보면 these guardians of the wilderness become aggressors, 주어, 동사, 보어가 다 갖춰진 완전한 문장이지? 그래서 관계대명사 which가 아니라 관계부사 where가 와. 여기서 guardians of the wilderness, 황야의 수호자들은 바로 맹수들을 말하는 거야.",
+   "show": [
+    "3d",
+    "3e",
+    "3f",
+    "3g"
+   ]
+  },
+  {
+   "view": "sentence",
+   "n": 3,
+   "say": "[curious] 자, 여기서 {호명}! 내용 일치 함정 하나 짚고 가자. 마지막 resulting in tragic outcomes for unsuspecting explorers는 분사구문인데, 결과를 나타내. 맹수가 공격자가 되어서, 그 결과 아무것도 모르는 탐험가들에게 비극적인 결과를 낳았다. 내용 일치에서 맹수 공격이 흔하다고 나오면 틀린 거야. 드물다고 했잖아.",
+   "show": [
+    "3h"
+   ]
+  },
+  {
+   "view": "sentence",
+   "n": 4,
+   "say": "네 번째 문장은 Yet으로 시작해. 그러나. 여기서 글의 흐름이 확 바뀌어. 이런 신호어가 나오면 바로 동그라미 쳐 두는 습관을 들이자. amid these serious situations, 이러한 심각한 상황 한가운데에서.",
+   "show": [
+    "4a",
+    "4b"
+   ]
+  },
+  {
+   "view": "sentence",
+   "n": 4,
+   "say": "주어는 a remarkable turn of events, 놀라운 사건의 전환, 즉 반전이야. 동사는 occurs. occur는 자동사라서 수동태가 안 돼. is occurred라고 쓰면 틀려. like unexpected notes in a familiar song은 익숙한 노래 속 예상치 못한 음표처럼, 비유 표현이야.",
+   "show": [
+    "4c",
+    "4d",
+    "4e"
+   ]
+  },
+  {
+   "view": "sentence",
+   "n": 5,
+   "say": "다섯 번째 문장부터 반전 사례가 나와. 1995년 오리건주의 숲에서 a man was found dead, 한 남자가 죽은 채로 발견됐어. found는 수동태고, dead는 보어야. died라고 쓰면 안 되겠지.",
+   "show": [
+    "5a",
+    "5b",
+    "5c",
+    "5d"
+   ]
+  },
+  {
+   "view": "sentence",
+   "n": 5,
+   "say": "{호명}, 이 blame A on B 꼭 외워 둬. initially blamed on a cougar는 수동의 분사구문이야. blame A on B, A를 B의 탓으로 돌리다. 처음에는 퓨마 탓으로 여겨졌는데, but subsequent investigation revealed otherwise, 이후의 조사는 그렇지 않다는 것을 밝혀냈어. otherwise가 여기서는 그렇지 않다는 것, 이라는 뜻이야.",
+   "show": [
+    "5e",
+    "5f",
+    "5g",
+    "5h",
+    "5i"
+   ]
+  },
+  {
+   "view": "sentence",
+   "n": 6,
+   "say": "여섯 번째 문장. Similarly, 마찬가지로. 사례를 하나 더 붙이는 신호어야. 2015년에도 a comparable incident, 비슷한 사건이 일어났어. comparable은 비슷한, 비교할 만한. comparative랑 헷갈리면 안 돼. comparative는 비교의, 상대적인이라는 뜻이야.",
+   "show": [
+    "6a",
+    "6b",
+    "6c"
+   ]
+  },
+  {
+   "view": "sentence",
+   "n": 6,
+   "say": "with initial suspicions falling on a nearby wolf pack은 with 분사구문이야. with 다음 목적어 suspicions, 의혹이 쏠리는 거니까 능동, falling. fall은 자동사라서 fallen으로 수동을 만들 수가 없어. 처음의 의혹은 근처의 늑대 무리에게 쏠렸다.",
+   "show": [
+    "6d"
+   ]
+  },
+  {
+   "view": "sentence",
+   "n": 7,
+   "say": "마지막 문장. However, 하지만. upon closer investigation, 더 면밀히 조사하자. upon 다음 명사나 동명사가 오면 ~하자마자, ~하자 라는 뜻이야. it became apparent that에서 it은 가주어, that절이 진주어야. 늑대들이 그 남자의 비극적인 운명에서 innocent bystanders, 무고한 구경꾼이었다는 게 분명해졌어.",
+   "show": [
+    "7a",
+    "7b",
+    "7c",
+    "7d",
+    "7f",
+    "7g"
+   ]
+  },
+  {
+   "view": "sentence",
+   "n": 7,
+   "say": "그리고 emphasizing the complexity inherent in such wilderness tragedies, 이것도 결과의 분사구문이야. 그 사실이 야생의 비극들에 내재된 복잡성을 강조한다. 이 부분이 바로 글의 결론이자 요지야. 주제 문제는 여기서 나와.",
+   "show": [
+    "7h"
+   ]
+  },
+  {
+   "view": "flow",
+   "say": "[excited] 자, 이제 글 전체를 그림으로 정리해 보자. 처음에는 야생 탐험객이 위험에 처한다는 이야기로 시작해. 그런데 4번 문장에서 반전이 나오지? 퓨마도, 늑대도 범인이 아니었어. 그래서 결론은, 야생의 비극은 보기보다 복잡하다는 거야.",
+   "show": [
+    "f1",
+    "f2",
+    "f3",
+    "f4"
+   ]
+  },
+  {
+   "view": "memo",
+   "say": "자, 글 전체 구조를 메모로 정리해 보자. 1번부터 3번 문장은 도입, 야생은 위험하고 맹수가 공격한 사례도 있다. 4번 Yet부터 반전, 퓨마와 늑대가 의심받았지만 범인이 아니었다. 그리고 7번에서 결론, 야생의 비극은 겉보기보다 복잡하다.",
+   "show": [
+    "memo1",
+    "memo2",
+    "memo3"
+   ]
+  },
+  {
+   "view": "memo",
+   "say": "어법 포인트도 한 번에 모아 볼게. caught, are, where, occurs, falling. 다섯 개 모두 시험에 그대로 나올 수 있는 자리니까 왜 그런지 이유까지 같이 외워 둬. 유의어도 같이 보자. formidable은 fearsome, comparable은 similar, subsequent는 later랑 바꿔 쓸 수 있어.",
+   "show": [
+    "memo4",
+    "memo5"
+   ]
+  },
+  {
+   "view": "vocab",
+   "say": "마지막으로 핵심 단어야. formidable 가공할 만한, infrequency 드묾, a considerable number of 상당수의, aggressor 공격자, unsuspecting 아무것도 모르는. subsequent 그 이후의, comparable 비슷한, bystander 구경꾼, inherent 내재된. 판서노트에 다 정리되어 있으니까 꼭 복습해.",
+   "show": [
+    "v1",
+    "v2",
+    "v3",
+    "v4",
+    "v5",
+    "v6",
+    "v7",
+    "v8",
+    "v9",
+    "v10"
+   ]
+  },
+  {
+   "view": "review",
+   "say": "오늘 지문은 여기까지야. 반전 신호어 Yet, 사례를 더하는 Similarly, 그리고 결론의 However까지 흐름을 다시 한 번 떠올려 보고, 연습지로 어법 다섯 개를 꼭 확인해 봐. 수고했어!"
+  }
+ ],
+ "flow": [
+  {
+   "id": "f1",
+   "k": "도입",
+   "text": "야생 탐험객은 위험에 처하기도 한다",
+   "n": "1-3"
+  },
+  {
+   "id": "f2",
+   "k": "반전",
+   "text": "예상치 못한 반전이 일어난다",
+   "n": "4"
+  },
+  {
+   "id": "f3",
+   "k": "사례",
+   "text": "퓨마도 늑대도 범인이 아니었다",
+   "n": "5-7"
+  },
+  {
+   "id": "f4",
+   "k": "결론",
+   "text": "야생의 비극은 보기보다 복잡하다",
+   "n": "7",
+   "hot": true
+  }
+ ],
+ "call_names": true
+}

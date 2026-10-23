@@ -1,0 +1,6 @@
+anthropic>=1.17,<2
+requests>=2.32,<3
+playwright>=1.55,<2
+imageio-ffmpeg>=0.6,<1
+edge-tts>=7.2
+faster-whisper>=1.1,<2

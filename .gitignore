@@ -1,0 +1,16 @@
+# 비밀값·로컬 데이터
+.dev.vars
+*.env
+settings.json
+# 도구
+node_modules/
+.wrangler/
+public/_engine/
+__pycache__/
+*.pyc
+.venv/
+engine/.update/
+engine/NO_AUTO_UPDATE
+# 운영체제
+.DS_Store
+Thumbs.db

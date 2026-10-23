@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<title>판서</title>
+<meta name="viewport" content="width=1920">
+<link rel="stylesheet" href="/assets/pretendard.css">
+<link rel="stylesheet" href="/assets/fonts/board.css">
+<link rel="stylesheet" href="/assets/board.css">
+<style>
+  html, body { margin: 0; padding: 0; background: #eceef5; }
+  body.render { width: 1920px; height: 1080px; overflow: hidden; }
+  html.print, body.print { background: #fff; }
+  @page { size: A4; margin: 12mm 10mm; }
+</style>
+</head>
+<body>
+<div id="host"></div>
+<script type="module">
+  // 학원 PC 제작 엔진이 이 페이지를 열어 판서를 한 장면씩 찍어요.
+  import { mountBoard, captionChunks, normalizeScript, resolveRange } from '/assets/board.js';
+  import { renderPractice, renderStudy } from '/assets/practice.js';
+  window.IvyBoard = { mountBoard, captionChunks, normalizeScript, resolveRange, renderPractice, renderStudy };
+  window.IvyBoardReady = true;
+</script>
+</body>
+</html>
