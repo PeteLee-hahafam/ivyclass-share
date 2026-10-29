@@ -38,6 +38,15 @@
 .bd-sent { position: relative; display: grid; grid-template-columns: 70px 1fr; padding: 30px 0 30px; border-bottom: 1px solid var(--bd-line); }
 .bd-no { width: 42px; height: 42px; border-radius: 50%; background: var(--bd-navy); color: #fff; font-size: 20px; font-weight: 700; display: grid; place-items: center; margin-top: 31px; }
 .bd-en { position: relative; z-index: 1; font-family: var(--bd-serif); font-size: 31px; line-height: 104px; color: var(--bd-ink); letter-spacing: 0.1px; }
+.bd-en .rm-gap { margin-left: 0.14em; } /* 동그라미·괄호 테두리 앞뒤 낱말 */
+.bd-en .mk-gap { margin-left: 0.22em; } /* 붙어 있는 괄호·동그라미 사이 */
+.bd-en .sl-gap { margin-left: 0.5em; } /* 끊어 읽기 사선 자리 */
+.bd-en .sl-gap2 { margin-left: 1.15em; } /* 긴 주어 뒤 사선 자리 (바로 뒤 동그라미·괄호와 안 겹치게) */
+.bd-en .tr-gap { margin-left: 0.6em; } /* 세모(등위접속사) 앞 */
+.bd-en .tr-gap2 { margin-left: 0.75em; } /* 세모 뒤 */
+.bd-en .pn-gap { margin-left: 0.3em; } /* 닫는 괄호 뒤 문장부호 */
+/* 소제목: 지문에 붙어 있던 제목을 그 문단 위에 따로 써요 */
+.bd-subhead { grid-column: 1 / -1; margin: 0 0 10px 70px; font-family: var(--bd-serif); font-size: 32px; font-weight: 600; line-height: 1.35; color: var(--bd-navy); letter-spacing: 0.1px; }
 .bd-ko { position: relative; z-index: 1; font-size: 29px; line-height: 54px; color: var(--bd-ko); margin-top: 2px; letter-spacing: -0.2px; }
 .bd-body { position: relative; }
 .bd-svg { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
@@ -67,9 +76,26 @@
 .bd-voc .grid.one { grid-template-columns: 1fr; }
 .bd-voc .bd-row { display: grid; grid-template-columns: 340px 1fr; gap: 14px; color: #2a2f3a; border-color: #f3e8cf; }
 .bd-voc .bd-row .w { justify-self: start; background: var(--bd-hl); padding: 0 6px; border-radius: 4px; }
+/* 유의어(=)와 반의어(↔): 뜻 뒤에 조금 작게. 유의어가 있으면 한 줄에 하나씩 넓게 써요 */
+.bd-voc .grid.wide .bd-row { grid-template-columns: 380px 1fr; }
+.bd-voc .bd-row .m .sy, .bd-voc .bd-row .m .an { font-size: 0.86em; margin-left: 22px; white-space: nowrap; }
+.bd-voc .bd-row .m .sy { color: #2c52c2; }
+.bd-voc .bd-row .m .an { color: #d4352b; }
 
-.bd-water { position: absolute; left: 50%; top: 50%; width: 330px; height: 330px; margin: -165px 0 0 -165px; transform: rotate(-16deg); opacity: 0.12; pointer-events: none; z-index: 5; display: grid; place-items: center; }
-.bd-water img { max-width: 100%; max-height: 100%; filter: grayscale(0.2); }
+/* 변형 포인트: 이 지문이 시험에서 어떻게 나올지 */
+.bd-exam { background: #f3faf5; border-color: #cfe8d8; }
+.bd-exam h4 { color: #17894b; }
+.bd-exam .bd-row { display: grid; grid-template-columns: auto 1fr auto; align-items: baseline; column-gap: 18px; color: #1d4d33; border-color: #dcefe3; }
+.bd-exam .bd-row .k { justify-self: start; font-family: var(--bd-sans); font-size: 21px; font-weight: 800; color: #17894b; border: 2px solid #8fd0a9; background: #fff; border-radius: 999px; padding: 1px 14px 2px; letter-spacing: -0.3px; white-space: nowrap; transform: translateY(-3px); }
+.bd-exam .bd-row .n { font-family: var(--bd-sans); font-size: 19px; font-weight: 600; color: #7b8a80; white-space: nowrap; }
+
+/* 워터마크(설정의 학원 로고): 기울이지 않고 정중앙에 크게, 흐리게.
+   영상·미리보기는 한 변이 화면 세로의 절반(540px), PDF는 쪽마다 한 변이 A4 세로의 절반(148.5mm) */
+.bd-water { position: absolute; left: 50%; top: 50%; width: 540px; height: 540px; margin: -270px 0 0 -270px; opacity: 0.1; mix-blend-mode: multiply; pointer-events: none; z-index: 5; }
+.bd-water img { display: block; width: 100%; height: 100%; object-fit: contain; }
+/* 인쇄할 때 position: fixed 는 쪽마다 같은 자리에 다시 찍혀요. --bd-wm 은 PDF를 줄여 찍는 비율만큼 키운 크기예요 */
+.bd-pwater { position: fixed; left: 50%; top: 50%; width: var(--bd-wm, 148.5mm); height: var(--bd-wm, 148.5mm); transform: translate(-50%, -50%); opacity: 0.1; mix-blend-mode: multiply; pointer-events: none; z-index: 50; }
+.bd-pwater img { display: block; width: 100%; height: 100%; object-fit: contain; }
 
 .bd-cap { position: absolute; left: 50%; bottom: 84px; transform: translateX(-50%); max-width: 1500px; z-index: 10; background: rgba(18, 18, 20, 0.88); color: #fff; font-size: 31px; font-weight: 500; line-height: 1.5; padding: 13px 32px 15px; border-radius: 15px; text-align: center; letter-spacing: -0.2px; white-space: pre-wrap; }
 .bd-cap:empty { display: none; }

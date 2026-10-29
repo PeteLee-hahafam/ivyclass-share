@@ -44,9 +44,17 @@ def _once(client, stream, on_event, kw):
         return s.get_final_message()
 
 
+def _add_text(user, extra):
+    """user 가 글이면 뒤에 붙이고, 블록 목록(사진, PDF와 글)이면 글 블록을 하나 더해요"""
+    if isinstance(user, list):
+        return user + [{'type': 'text', 'text': extra}]
+    return user + extra
+
+
 def call_tool(client, *, model, system, user, tool, max_tokens, stream=False, on_event=None, log=None):
     """도구 하나로 결과를 받아요. (message, tool_use 블록 또는 None)
 
+    user 는 글 하나, 또는 사진·PDF 블록이 섞인 내용 블록 목록이에요.
     anthropic 오류는 그대로 올려 보내요(부르는 쪽에서 한국어 안내로 바꿔요).
     """
     import anthropic
@@ -83,4 +91,4 @@ def call_tool(client, *, model, system, user, tool, max_tokens, stream=False, on
         if log:
             log(f'  · Claude가 {name} 도구를 부르지 않아서 한 번 더 부탁해요')
         nudged = True
-        user = user + NUDGE.format(name=name)
+        user = _add_text(user, NUDGE.format(name=name))

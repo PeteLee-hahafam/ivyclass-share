@@ -3,6 +3,9 @@ import { currentUser, handleAuth, requireRole } from './auth.js';
 import { handleAdmin } from './api_admin.js';
 import { handleStudent, canSeeLecture } from './api_student.js';
 import { handleEngine, engineAuth, voiceOf } from './api_engine.js';
+import { handleBankAdmin, handleBankStudent } from './api_bank.js';
+import { handleLtPublic, handleLtAdmin } from './api_lt.js';
+import { handleExamAdmin, handleExamStudent } from './api_exam.js';
 import { handleUpload, serveObject, kindInfo, verifyLink } from './media.js';
 import { ensureDb } from './db.js';
 
@@ -112,6 +115,13 @@ async function route(request, env) {
   const auth = await handleAuth(request, env, path, user);
   if (auth) return auth;
 
+  // 레벨테스트 (링크로 들어온 학생은 로그인하지 않아요)
+  if (path.startsWith('/api/lt/')) {
+    const r = await handleLtPublic(request, env, path, user);
+    if (r) return r;
+    throw new HttpError(404, '없는 주소예요.');
+  }
+
   if (path.startsWith('/api/up/')) {
     requireRole(user, 'admin');
     const r = await handleUpload(request, env, path, async (id) => {
@@ -122,12 +132,12 @@ async function route(request, env) {
   }
   if (path.startsWith('/api/admin/')) {
     requireRole(user, 'admin');
-    const r = await handleAdmin(request, env, path, user);
+    const r = (await handleAdmin(request, env, path, user)) || (await handleBankAdmin(request, env, path, user)) || (await handleExamAdmin(request, env, path)) || (await handleLtAdmin(request, env, path));
     if (r) return r;
   }
   if (path.startsWith('/api/student/')) {
     requireRole(user);
-    const r = await handleStudent(request, env, path, user);
+    const r = (await handleStudent(request, env, path, user)) || (await handleBankStudent(request, env, path, user)) || (await handleExamStudent(request, env, path, user));
     if (r) return r;
   }
   throw new HttpError(404, '없는 주소예요.');

@@ -59,8 +59,12 @@ export const DEMO_SCRIPT = {
   memo: [{ id: 'm1', text: '어법 포인트: was found dead (died ✕), became apparent (2형식은 동사와 보어를 함께)' }],
   summary: [{ id: 's1', k: '주제', v: '야생 비극에 숨은 복잡성' }],
   vocab: [
-    { id: 'v1', en: 'formidable', ko: '가공할 만한' },
-    { id: 'v2', en: 'bystander', ko: '구경꾼' },
+    { id: 'v1', en: 'formidable', ko: '가공할 만한', syn: ['fearsome'], ant: ['harmless'] },
+    { id: 'v2', en: 'bystander', ko: '구경꾼', syn: ['onlooker'] },
+  ],
+  exam: [
+    { id: 'e1', k: '어법', text: 'was found dead: 보어 자리라 died로 바꾸면 틀림', n: '2' },
+    { id: 'e2', k: '어휘', text: 'formidable을 harmless로 바꾼 틀린 낱말', n: '1' },
   ],
   steps: [
     { view: 'sentence', n: 1, say: '첫 문장 예시예요.' },

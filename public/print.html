@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시험지 인쇄</title>
+<link rel="stylesheet" href="/assets/pretendard.css">
+<link rel="stylesheet" href="/assets/fonts/print/fonts.css">
+<link rel="stylesheet" href="/assets/printsheet.css">
+</head>
+<body>
+<div class="ps-bar" id="bar">
+  <div class="ps-bar-in">
+    <b id="bar-title">시험지</b>
+    <span class="ps-sp"></span>
+    <button class="ps-btn pri" id="print-exam" disabled>시험지와 답안지 인쇄</button>
+    <button class="ps-btn" id="print-key" disabled>정답과 해설 인쇄</button>
+  </div>
+  <div class="ps-msg" id="msg">시험지를 만드는 중이에요…</div>
+</div>
+<main id="book"></main>
+<div id="src" aria-hidden="true"></div>
+<script type="module" src="/assets/printsheet.js"></script>
+</body>
+</html>

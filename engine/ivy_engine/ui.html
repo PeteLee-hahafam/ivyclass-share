@@ -279,7 +279,8 @@ function form() {
 function say(el, r) { el.textContent = r.message || (r.ok ? '완료' : '실패'); el.className = 'msg ' + (r.ok ? 'ok' : 'err'); }
 function busy(el, text) { el.textContent = text; el.className = 'msg'; }
 function setChip(tone, text) { const c = $('chip'); c.className = 'state ' + tone; c.lastElementChild.textContent = text; }
-const STAGE = { script: '대본', render: '영상', transcribe: '자막', summarize: 'AI 요약' };
+const STAGE = { script: '대본', render: '영상', transcribe: '자막', summarize: 'AI 요약', quiz: '확인 문제', bank: '문제 은행', read: '사진에서 지문', ltwrite: '레벨테스트 라이팅' };
+const VERB = { read: '읽는 중', ltwrite: '채점하는 중' };
 
 function marks(st) {
   const sec = st.secrets;
@@ -300,7 +301,7 @@ async function refresh() {
   $('vnow').textContent = st.version;
   if (st.update) $('vinfo').textContent = st.update.pending ? `새 버전 ${st.update.version} 준비 중` : `사이트의 엔진 ${st.update.version}과 같아요`;
   else $('vinfo').textContent = st.auto_update_off ? '개발용 폴더라 자동 업데이트를 하지 않아요' : '';
-  $('status').textContent = st.job ? `${STAGE[st.job.stage] || ''} 만드는 중: ${st.job.title || ''}` : st.status;
+  $('status').textContent = st.job ? `${STAGE[st.job.stage] || ''} ${VERB[st.job.stage] || '만드는 중'}: ${st.job.title || ''}` : st.status;
   $('academy').textContent = st.connected ? `${st.academy || ''} 강의실에 연결됨 (${st.origin})` : '아직 강의실에 연결되지 않았어요';
   $('done').textContent = `이번에 만든 것 ${st.done_count}개`;
   if (st.job) setChip('work', '만드는 중'); else if (st.connected) setChip('on', '연결됨'); else setChip('', '연결 전');

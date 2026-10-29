@@ -1,5 +1,5 @@
 // 연습지 (A4 인쇄용). 학원 PC 제작 엔진이 PDF로 만들어 올려요.
-import { normalizeScript } from './board.js';
+import { normalizeScript, printWatermark } from './board.js';
 
 const CSS = `
 .pr { font-family: 'Pretendard Variable', Pretendard, 'Malgun Gothic', sans-serif; color: #1c2333; font-size: 13.5px; line-height: 1.6; width: 100%; }
@@ -112,7 +112,8 @@ export function renderPractice(host, input, opts = {}) {
   key.appendChild(h('div', { class: 'top' }, [h('div', {}, [h('div', { class: 'ac', text: opts.academy || '' }), h('h1', { text: '정답과 해설' }), h('div', { class: 'src', text: s.title || '' })])]));
   if (s.vocab.length) {
     key.appendChild(sec('어휘 확인'));
-    key.appendChild(h('table', {}, s.vocab.map((v, i) => h('tr', {}, [h('td', { class: 'k', text: String(i + 1) }), h('td', { style: "font-family:'Noto Serif',Georgia,serif", text: v.en }), h('td', { class: 'a', text: v.ko })]))));
+    const extra = (v) => [(v.syn || []).length ? ` (= ${v.syn.join(', ')})` : '', (v.ant || []).length ? ` (↔ ${v.ant.join(', ')})` : ''].join('');
+    key.appendChild(h('table', {}, s.vocab.map((v, i) => h('tr', {}, [h('td', { class: 'k', text: String(i + 1) }), h('td', { style: "font-family:'Noto Serif',Georgia,serif", text: v.en }), h('td', { class: 'a', text: `${v.ko}${extra(v)}` })]))));
   }
   if (grammar.length) {
     key.appendChild(sec('어법 선택'));
@@ -128,7 +129,9 @@ export function renderPractice(host, input, opts = {}) {
   }
   root.appendChild(key);
   host.appendChild(root);
+  const wm = printWatermark(opts.logo, opts.pageScale);
   return (async () => {
+    await wm.ready;
     if (document.fonts) {
       const all = root.textContent;
       await Promise.race([
@@ -199,7 +202,9 @@ export function renderStudy(host, data, opts = {}) {
   }
   if (vocab.length || quiz.length) root.appendChild(key);
   host.appendChild(root);
+  const wm = printWatermark(opts.logo, opts.pageScale);
   return (async () => {
+    await wm.ready;
     if (document.fonts) {
       await Promise.race([
         Promise.all([document.fonts.load('500 14px "Pretendard Variable"', root.textContent), document.fonts.load('400 14px "Noto Serif"', 'Aa')].map((x) => x.catch(() => null))),

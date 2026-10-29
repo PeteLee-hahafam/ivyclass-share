@@ -145,6 +145,7 @@ export async function getSettings(env) {
     academy_name: s.academy_name || '우리 학원',
     app_name: s.app_name || '온라인 강의실',
     header_text: s.header_text || '',
+    academy_phone: s.academy_phone || '',
     logo_key: s.logo_key || '',
     complete_threshold: int(s.complete_threshold, 90),
     prevent_skip: s.prevent_skip === '1',
@@ -155,35 +156,78 @@ export async function getSettings(env) {
     engine_info: s.engine_info ? safeParse(s.engine_info) : null,
     board_style: safeParse(s.board_style, {}) || {},
     recovery_at: int(s.recovery_at, 0),
+    // 레벨테스트: 링크로 받기(처음에는 켜져 있어요), 기본 영역 묶음, 학원 교재 목록(없으면 기본 목록)
+    lt_open: s.lt_open !== '0',
+    lt_preset: s.lt_preset || 'new',
+    lt_books: safeParse(s.lt_books, null),
   };
 }
 
 // 판서 스타일 (선생님이 고른 글꼴·색·표기 방식·AI 판서 규칙). public/assets/board.js 의 DEFAULT_STYLE 과 같아야 해요.
+// 규칙 버전 2: 괄호 안은 사선만, 문장 뒤 분사구문, 의문문, 도치. 버전 3: 수식어 괄호.
+// 버전 4: 해석 기준, 동그라미는 동사만(조동사·사이 부사까지 한 덩어리), 접속부사·문두 전명구 괄호, 병렬 세모, 긴 주어 뒤 사선, 소제목 (board.js RULES_ADDED 와 같아요)
+const RULES_ADDED = {
+  2: [
+    "- 괄호 안에는 밑줄·동그라미 같은 표시 없이 사선만 쓴다. 사선은 긴 명사절·형용사절·부사절에서만, 절의 주어+동사(또는 주어+동사+목적어)까지 읽은 뒤 수식어가 시작되는 곳처럼 자연스럽게 쉬어 읽는 곳에만 긋는다",
+    "- 문장 뒤에 나오는 분사구문은 괄호로 묶지 않고 분사를 동사처럼 동그라미. 앞 문장에 이어 '그리고' 또는 '그래서'를 붙여 해석한다",
+    "- 의문문은 의문사를 괄호, 앞에 나오는 be동사·조동사는 주어와 함께 밑줄(주어가 길면 괄호)로 주어임을 분명히 하고 '은/는/이/가'를 붙여 해석한다. 주어 뒤에 오는 말은 품사와 상관없이 동사처럼 동그라미 치고 '~니?/~까?'를 붙여 해석한다",
+    "- 도치 구문은 맨 앞으로 나온 말을 괄호, 나머지는 의문문처럼 앞의 be동사·조동사와 주어를 함께 밑줄, 주어 뒤에 오는 말은 동사처럼 동그라미",
+  ],
+  3: ["- 부사, 전치사구 같은 수식어는 괄호. 이어서 나오는 수식어는 통으로 한 괄호 (예: (all night), (quietly on the bench))"],
+  4: [
+    "- 판서는 해석 기준: 읽고 해석하는 덩어리대로 표시한다",
+    "- 동그라미는 동사(해석할 때 '~다', '~니?'가 붙는 말)에만 친다. 접속부사(however, therefore 등)는 괄호",
+    "- 주절의 주어가 길면 주어가 끝나고 동사가 시작되는 곳, 읽을 때 쉬는 곳에 사선",
+    "- 소제목은 문장에 붙어 있어도 떼어서 그 문단 위에 따로 쓴다",
+  ],
+};
+const RULES_V = 4;
+const VERB_RULE = "- 동사는 조동사와 사이에 낀 부사까지 한 동그라미 (예: will also search). 현재완료·과거완료도 have, has, had부터 p.p.까지 한 동그라미 (예: has already finished). 시제와 태(수동태)도 해석 기준으로 함께 묶는다";
+const FRONT_RULE = "- 문장 맨 앞에 나오는 부사는 단어·구·절 모두 괄호. For example, In addition 같은 전명구도 부사구라서 통째로 괄호";
+const CONJ_RULE = "- 등위접속사는 문장과 문장을 이을 때 세모. 뒤에 주어 없이 동사가 와서 병렬로 이어질 때도 세모";
 export const DEFAULT_RULES = [
+  RULES_ADDED[4][0],
   "- 주어·목적어·목적격 보어는 밑줄",
-  "- 동사는 시제와 태(조동사·수동태 포함)까지 해석 기준으로 동그라미",
+  VERB_RULE,
   "- 2형식은 해석 기준('~다')이라 보어가 3단어까지면 동사와 보어를 함께 동그라미, 3단어가 넘으면 동사는 동그라미, 보어는 괄호",
   "- 주어·목적어는 3단어 이상이면 구로 보고 괄호",
   "- 동명사구, to부정사구, 분사구는 괄호",
-  "- 문장 맨 앞에 나오는 부사는 단어·구·절 모두 괄호",
+  FRONT_RULE,
   "- that절, what절, whether절, if절, 복합관계대명사절 같은 명사절은 모두 괄호",
-  "- 등위접속사는 문장과 문장을 이을 때만 세모",
+  CONJ_RULE,
+  ...RULES_ADDED[2],
+  ...RULES_ADDED[3],
+  ...RULES_ADDED[4].slice(1),
 ].join('\n');
 
-// 예전 기본 규칙 줄을 새 규칙으로 바꿔요 (board.js migrateRules 와 같아요)
+// 예전 기본 규칙 줄을 새 규칙으로 바꾸고, 저장한 뒤 새로 생긴 기본 규칙은 한 번만 더해요 (board.js migrateRules 와 같아요)
 const OLD_RULE_LINES = [
   ["- 주어·목적어·보어는 밑줄", "- 주어·목적어·목적격 보어는 밑줄"],
   ["- 2형식은 '~다'로 해석하니까 동사와 보어를 함께 동그라미. 단, 보어가 3단어 이상이면 동사는 동그라미, 보어는 따로 표시", "- 2형식은 해석 기준('~다')이라 보어가 3단어까지면 동사와 보어를 함께 동그라미, 3단어가 넘으면 동사는 동그라미, 보어는 괄호"],
   ["- 주어·목적어·보어라도 3단어 이상이면 구로 보고 괄호", "- 주어·목적어는 3단어 이상이면 구로 보고 괄호"],
+  ["- 끊어 읽기 사선(/)은 긴 명사절·형용사절·부사절의 괄호 안에서만 쓴다. 의미 단위마다 끊지 말고, 절의 주어+동사(또는 주어+동사+목적어)까지 읽은 뒤 수식어가 시작되는 곳처럼 자연스럽게 쉬어 읽는 곳에만 긋는다", "- 괄호 안에는 밑줄·동그라미 같은 표시 없이 사선만 쓴다. 사선은 긴 명사절·형용사절·부사절에서만, 절의 주어+동사(또는 주어+동사+목적어)까지 읽은 뒤 수식어가 시작되는 곳처럼 자연스럽게 쉬어 읽는 곳에만 긋는다"],
+  ["- 동사는 시제와 태(조동사·수동태 포함)까지 해석 기준으로 동그라미", VERB_RULE],
+  ["- 문장 맨 앞에 나오는 부사는 단어·구·절 모두 괄호", FRONT_RULE],
+  ["- 등위접속사는 문장과 문장을 이을 때만 세모", CONJ_RULE],
+  ["- 의문문은 의문사를 괄호, be동사·조동사 뒤의 주어는 밑줄(길면 괄호)로 주어임을 분명히 하고 '은/는/이/가'를 붙여 해석한다. 주어 뒤에 오는 말은 품사와 상관없이 동사처럼 동그라미 치고 '~니?/~까?'를 붙여 해석한다", RULES_ADDED[2][2]],
+  ["- 도치 구문은 맨 앞으로 나온 말을 괄호, 나머지는 의문문처럼 주어는 밑줄, 주어 뒤에 오는 말은 동사처럼 동그라미", RULES_ADDED[2][3]],
 ];
-function migrateRules(text) {
-  return String(text)
+function migrateRules(text, v) {
+  const lines = String(text)
     .split('\n')
     .map((line) => {
       const hit = OLD_RULE_LINES.find(([a]) => line.trim() === a);
       return hit ? hit[1] : line;
-    })
-    .join('\n');
+    });
+  const from = Number(v) || 1;
+  for (const [ver, add] of Object.entries(RULES_ADDED)) {
+    if (from >= Number(ver)) continue;
+    const missing = add.filter((a) => !lines.some((l) => l.trim() === a));
+    if (!missing.length) continue;
+    while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+    lines.push(...missing);
+  }
+  return lines.join('\n');
 }
 
 export function cleanStyle(x) {
@@ -211,7 +255,8 @@ export function cleanStyle(x) {
       highlight: hex(c.highlight, '#ffe27a'),
       accent: hex(c.accent, '#1f2d5c'),
     },
-    rules: o.rules === undefined || o.rules === null ? DEFAULT_RULES : migrateRules(String(o.rules).trim().slice(0, 3000)),
+    rules: o.rules === undefined || o.rules === null ? DEFAULT_RULES : migrateRules(String(o.rules).trim(), o.rules_v).slice(0, 3000),
+    rules_v: RULES_V,
   };
 }
 
@@ -237,7 +282,17 @@ export function safeParse(s, fallback = null) {
   }
 }
 
-// 학생 이름 부르기: 선생님이 '부를 이름'을 적었으면 그대로, 아니면 김하준 → 하준아 (반말), 김하준 학생 (존댓말)
+// 강의 학년 (새 강의, 강의 목록 구분, 대본·문제 수준)
+export const LECTURE_LEVELS = ['mid1', 'mid2', 'mid3', 'high1', 'high2', 'high3'];
+// 1.4.0 이전 엔진은 mid1, mid2 를 몰라서 학년 이름으로 바꿔 보내요 (새 엔진은 둘 다 알아요)
+const OLD_ENGINE_LEVEL = { mid1: '중학교 1학년', mid2: '중학교 2학년' };
+export function engineOptions(raw) {
+  const o = typeof raw === 'string' ? safeParse(raw, {}) || {} : { ...(raw || {}) };
+  if (OLD_ENGINE_LEVEL[o.level]) o.level = OLD_ENGINE_LEVEL[o.level];
+  return o;
+}
+
+// 학생 이름 부르기: 선생님이 '부를 이름'을 적었으면 그대로, 아니면 김하준 → 하준아 (반말, 반존대), 김하준 학생 (존댓말)
 export function callText(user, tone) {
   const custom = String((user && user.call_name) || '').trim();
   if (custom) return custom;

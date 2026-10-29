@@ -322,12 +322,12 @@ export function Editor({ id }) {
         <${Field} label="핵심 정리" hint="한 줄에 하나씩"><textarea rows="5" value=${(sm.points || []).join('\n')} onInput=${(e) => setSmF({ points: e.target.value.split('\n') })}></textarea></${Field}>
         <${Field} label="단어" hint="한 줄에 하나씩: 단어 = 뜻"><textarea rows="4" value=${(sm.vocab || []).map((v) => `${v.en} = ${v.ko}`).join('\n')}
           onInput=${(e) => setSmF({ vocab: e.target.value.split('\n').map((l) => { const [en, ...ko] = l.split('='); return { en: (en || '').trim(), ko: ko.join('=').trim() }; }) })}></textarea></${Field}>
-        ${(sm.quiz || []).length > 0 && html`<div class="label">확인 문제 ${sm.quiz.length}개</div><ul class="ed-list">${sm.quiz.map((q, i) => html`<li style="align-items:flex-start"><span class="num faint">${i + 1}</span><span style="flex:1">${q.q}<div class="faint" style="font-size:12.5px">정답: ${q.choices[q.answer] || ''}</div></span>
+        ${(sm.quiz || []).length > 0 && html`<div class="label">스스로 풀어 보기 ${sm.quiz.length}개</div><ul class="ed-list">${sm.quiz.map((q, i) => html`<li style="align-items:flex-start"><span class="num faint">${i + 1}</span><span style="flex:1">${q.q}<div class="faint" style="font-size:12.5px">정답: ${q.choices[q.answer] || ''}</div></span>
           <button class="btn ghost icon sm" title="빼기" onClick=${() => setSmF({ quiz: sm.quiz.filter((_, j) => j !== i) })}><${Icon} name="x" size="sm" /></button></li>`)}</ul>`}
         <div class="row wrap" style="gap:8px"><${Btn} kind="primary" size="sm" icon="save" busy=${busy === 'sm'} disabled=${!smDirty} onClick=${saveSm}>요약 저장</${Btn}>
           <${Btn} size="sm" icon="refresh" onClick=${() => runTask('summarize', true)}>다시 만들기</${Btn}></div>
-        <div class="faint" style="font-size:12.5px">학생 앱 강의 아래에 요약과 확인 문제가 보여요. 복습 노트 PDF는 다시 만들기를 해야 새로 바뀌어요.</div>`
-      : html`<p class="muted ed-p">Claude가 강의 내용을 읽고 한 줄 요약, 핵심 정리, 목차, 단어, 확인 문제를 만들어요. 올린 강의는 복습 노트 PDF도 함께 만들어요.</p>
+        <div class="faint" style="font-size:12.5px">학생 앱 강의 아래에 요약과 스스로 풀어 보는 문제가 보여요. 복습 노트 PDF는 다시 만들기를 해야 새로 바뀌어요.</div>`
+      : html`<p class="muted ed-p">Claude가 강의 내용을 읽고 한 줄 요약, 핵심 정리, 목차, 단어, 스스로 풀어 보는 문제를 만들어요. 올린 강의는 복습 노트 PDF도 함께 만들어요.</p>
         <${Btn} kind="primary" icon="sparkles" disabled=${!canSum || (su && ['queued', 'running'].includes(su.status))} onClick=${() => runTask('summarize')}>AI 요약 만들기</${Btn}>
         ${!canSum && html`<div class="faint" style="font-size:13px">자막을 먼저 만들어 주세요. 요약은 자막 내용으로 만들어요.</div>`}`}
   </div>`;

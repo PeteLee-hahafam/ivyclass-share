@@ -1,5 +1,8 @@
-import { HttpError, json, readJson, str, int, now, getSettings, setSettings, sha256Hex, safeEqual, safeParse, cleanStyle, callText } from './util.js';
+import { HttpError, json, readJson, str, int, now, getSettings, setSettings, sha256Hex, safeEqual, safeParse, cleanStyle, callText, engineOptions } from './util.js';
 import { serveObject } from './media.js';
+import { cleanQuiz } from './quiz.js';
+import { cleanBankItem, queueFirstBank, ensureHomework, bankRows } from './bank.js';
+import { ltTaskPayload, ltTaskDone, ltTaskFailed } from './api_lt.js';
 
 export async function engineAuth(request, env) {
   const h = request.headers.get('Authorization') || '';
@@ -11,7 +14,9 @@ export async function engineAuth(request, env) {
 }
 
 const STALE = 3 * 3600; // 엔진이 멈춘 작업은 3시간 뒤 다시 줄을 세워요
-const TASK_KINDS = ['transcribe', 'summarize'];
+const TASK_KINDS = ['transcribe', 'summarize', 'quiz', 'bank', 'read', 'ltwrite'];
+// 예전 엔진은 무슨 작업을 할 수 있는지 알려 주지 않아요. 그때는 자막·요약만 줘요 (확인 문제는 1.1.8부터, 문제 은행과 사진 읽기는 1.3.0부터, 레벨테스트 라이팅 채점은 1.5.0부터)
+const OLD_ENGINE_KINDS = ['transcribe', 'summarize'];
 const round2 = (x) => Math.round(Number(x) * 100) / 100;
 
 // 강의를 만든 목소리 정보 (이름 목소리를 같은 목소리로 만들 때 써요). 비밀 키는 들어 있지 않아요.
@@ -63,21 +68,33 @@ async function claimLecture(env) {
     .first();
 }
 
-async function claimTask(env) {
+async function claimTask(env, kinds) {
+  const ok = kinds.filter((k) => TASK_KINDS.includes(k));
+  if (!ok.length) return null;
   for (let i = 0; i < 5; i++) {
     const t = await env.DB.prepare(
       `UPDATE tasks SET status = 'running', claimed_at = ?, progress = 0, progress_msg = '작업을 시작했어요', updated_at = ?
-        WHERE id = (SELECT id FROM tasks WHERE status = 'queued' ORDER BY created_at LIMIT 1)
+        WHERE id = (SELECT id FROM tasks WHERE status = 'queued' AND kind IN (${ok.map(() => '?').join(',')})
+                     ORDER BY CASE WHEN kind = 'read' THEN 0 WHEN kind = 'ltwrite' THEN 1 WHEN payload LIKE '%"backfill":true%' THEN 3 ELSE 2 END, created_at LIMIT 1)
         RETURNING *`,
     )
-      .bind(now(), now())
+      .bind(now(), now(), ...ok)
       .first();
     if (!t) return null;
+    if (t.kind === 'read' || t.kind === 'ltwrite') return { t, l: null };
     const l = await env.DB.prepare('SELECT * FROM lectures WHERE id = ?').bind(t.lecture_id).first();
     if (l) return { t, l };
     await env.DB.prepare('DELETE FROM tasks WHERE id = ?').bind(t.id).run();
   }
   return null;
+}
+
+export async function queueQuiz(env, lectureId) {
+  const l = await env.DB.prepare('SELECT quiz IS NOT NULL AS has_quiz FROM lectures WHERE id = ?').bind(lectureId).first();
+  if (!l || l.has_quiz) return null;
+  const busy = await env.DB.prepare("SELECT id FROM tasks WHERE lecture_id = ? AND kind = 'quiz' AND status IN ('queued','running')").bind(lectureId).first();
+  if (busy) return null;
+  return env.DB.prepare("INSERT INTO tasks (kind, lecture_id, status, created_at, updated_at) VALUES ('quiz', ?, 'queued', ?, ?)").bind(lectureId, now() + 2, now());
 }
 
 export async function handleEngine(request, env, path) {
@@ -104,6 +121,8 @@ export async function handleEngine(request, env, path) {
 
   // ---------------------------------------------------------------- 다음 일 받기 (강의 먼저, 그다음 자막·요약)
   if (path === '/api/engine/next' && m === 'POST') {
+    const nb = await readJson(request);
+    const kinds = Array.isArray(nb.kinds) ? nb.kinds.map((k) => String(k)) : OLD_ENGINE_KINDS;
     await setSettings(env, { engine_last_seen: now() });
     await env.DB.batch([
       env.DB.prepare(
@@ -123,32 +142,57 @@ export async function handleEngine(request, env, path) {
           tool: row.tool,
           passage: row.passage,
           translation: row.translation,
-          options: safeParse(row.options, {}),
+          options: engineOptions(row.options),
           script: safeParse(row.script, null),
         },
       });
     }
-    const got = await claimTask(env);
+    const got = await claimTask(env, kinds);
     if (!got) return json({ job: null });
     const { t, l } = got;
-    return json({
-      job: null,
-      task: {
-        id: t.id,
-        kind: t.kind,
-        lecture_id: l.id,
-        title: l.title,
-        source: l.source,
-        tool: l.tool,
-        duration: l.duration,
-        has_video: !!l.video_key,
-        passage: l.passage,
-        options: safeParse(l.options, {}),
-        script: safeParse(l.script, null),
-        transcript: safeParse(l.transcript, null),
-        edit: safeParse(l.edit, {}),
-      },
-    });
+    const payload = safeParse(t.payload, {}) || {};
+    if (t.kind === 'ltwrite') {
+      // 레벨테스트 라이팅 채점: 학생 답과 채점 기준을 줘요. 응시 기록이 지워졌으면 작업도 지워요
+      const task = await ltTaskPayload(env, t);
+      if (task) return json({ job: null, task });
+      await env.DB.prepare('DELETE FROM tasks WHERE id = ?').bind(t.id).run();
+      return json({ job: null });
+    }
+    if (t.kind === 'read') {
+      // 교과서 사진·PDF에서 지문 글자 읽기: 엔진이 파일을 하나씩 받아 가요
+      const ids = (payload.ids || []).map((x) => int(x)).filter(Boolean);
+      const { results } = ids.length ? await env.DB.prepare(`SELECT id, name, mime, size FROM materials WHERE key IS NOT NULL AND id IN (${ids.map(() => '?').join(',')})`).bind(...ids).all() : { results: [] };
+      const byId = new Map(results.map((r) => [r.id, r]));
+      return json({ job: null, task: { id: t.id, kind: 'read', lecture_id: null, title: '사진에서 지문 읽기', files: ids.map((x) => byId.get(x)).filter(Boolean) } });
+    }
+    const task = {
+      id: t.id,
+      kind: t.kind,
+      lecture_id: l.id,
+      title: l.title,
+      source: l.source,
+      tool: l.tool,
+      duration: l.duration,
+      has_video: !!l.video_key,
+      passage: l.passage,
+      options: engineOptions(l.options),
+      script: safeParse(l.script, null),
+      transcript: safeParse(l.transcript, null),
+      edit: safeParse(l.edit, {}),
+    };
+    if (t.kind === 'bank') {
+      // 문제 은행 채우기: 선생님 문제 자료(본보기)와 이미 있는 문제(겹치지 않게)를 같이 줘요
+      task.translation = l.translation;
+      task.want = payload.want || { mc: 24, sa: 8 };
+      task.seeds = (
+        await env.DB.prepare("SELECT id, name, mime, size, key IS NOT NULL AS has_file, CASE WHEN key IS NULL THEN text END AS text FROM materials WHERE lecture_id = ? AND purpose = 'seed' ORDER BY id LIMIT 20").bind(l.id).all()
+      ).results.map((r) => ({ ...r, has_file: !!r.has_file }));
+      task.have = (await bankRows(env, l.id, true)).slice(-160).map((r) => {
+        const it = safeParse(r.data, {}) || {};
+        return { type: r.type, area: r.area, q: str(it.q, 120), text: str(it.text, 140), answer: r.type === 'mc' ? str((it.choices || [])[it.answer], 80) : str(it.answer, 80) };
+      });
+    }
+    return json({ job: null, task });
   }
 
   // ---------------------------------------------------------------- 강의 만들기 진행
@@ -196,6 +240,10 @@ export async function handleEngine(request, env, path) {
           stmts.push(env.DB.prepare('UPDATE lectures SET edit = ? WHERE id = ?').bind(JSON.stringify(edit), id));
         }
       }
+      const q = await queueQuiz(env, id);
+      if (q) stmts.push(q);
+      const bq = await queueFirstBank(env, id);
+      if (bq) stmts.push(bq);
       await env.DB.batch(stmts);
       return json({ ok: true });
     }
@@ -203,6 +251,13 @@ export async function handleEngine(request, env, path) {
       await env.DB.prepare("UPDATE lectures SET status = 'failed', error = ?, progress_msg = NULL, updated_at = ? WHERE id = ?").bind(str(b.error, 1000), now(), id).run();
       return json({ ok: true });
     }
+  }
+
+  // 엔진이 올린 자료 파일(교과서 사진·PDF, 문제 자료)을 받아 가요
+  if ((mm = path.match(/^\/api\/engine\/materials\/(\d+)\/file$/)) && (m === 'GET' || m === 'HEAD')) {
+    const r = await env.DB.prepare('SELECT key, mime FROM materials WHERE id = ?').bind(int(mm[1])).first();
+    if (!r || !r.key) throw new HttpError(404, '자료 파일이 없어요. 선생님이 지웠을 수 있어요.', 'gone');
+    return serveObject(request, env, r.key, { type: r.mime, cache: 'no-store' });
   }
 
   // 자막을 만들려고 선생님이 올린 영상을 받아 가요
@@ -229,11 +284,39 @@ export async function handleEngine(request, env, path) {
     }
     if (act === 'fail') {
       await env.DB.prepare("UPDATE tasks SET status = 'failed', error = ?, progress_msg = NULL, updated_at = ? WHERE id = ?").bind(str(b.error, 1000), now(), id).run();
+      if (t.kind === 'ltwrite') await ltTaskFailed(env, t);
       return json({ ok: true });
     }
     // done
+    if (t.kind === 'ltwrite') {
+      await ltTaskDone(env, t, b);
+      return json({ ok: true });
+    }
+    if (t.kind === 'read') {
+      const r = b.read && typeof b.read === 'object' ? b.read : {};
+      const result = { title: str(r.title, 120), source: str(r.source, 120), passage: str(r.passage, 20000), translation: str(r.translation, 20000), note: str(r.note, 400) };
+      if (!result.passage) throw new HttpError(400, '읽어 낸 지문이 없어요.');
+      await env.DB.prepare("UPDATE tasks SET status = 'done', progress = 100, progress_msg = NULL, error = NULL, result = ?, updated_at = ? WHERE id = ?").bind(JSON.stringify(result), now(), id).run();
+      return json({ ok: true });
+    }
     const l = await env.DB.prepare('SELECT id, edit, options FROM lectures WHERE id = ?').bind(t.lecture_id).first();
     if (!l) throw new HttpError(404, '강의가 없어요.', 'gone');
+    if (t.kind === 'bank') {
+      const list = (b.bank && Array.isArray(b.bank.items) ? b.bank.items : []).slice(0, 80);
+      const fromSeed = !!(b.bank && b.bank.seeded);
+      const rows = [];
+      for (const raw of list) {
+        const it = cleanBankItem(raw);
+        if (!it) continue;
+        const score = Math.max(1, Math.min(5, int(raw.score, 3)));
+        rows.push(env.DB.prepare('INSERT INTO bank_items (lecture_id, type, area, data, score, source, task_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+          .bind(l.id, it.type, it.type === 'sa' ? it.kind : it.area, JSON.stringify(it), score, fromSeed ? 'seed' : 'ai', id, now()));
+      }
+      if (!rows.length) throw new HttpError(400, '문제 은행에 넣을 문제가 없어요.');
+      await env.DB.batch([...rows, env.DB.prepare("UPDATE tasks SET status = 'done', progress = 100, progress_msg = NULL, error = NULL, result = ?, updated_at = ? WHERE id = ?").bind(JSON.stringify({ added: rows.length }), now(), id)]);
+      await ensureHomework(env, l.id);
+      return json({ ok: true, added: rows.length });
+    }
     const stmts = [env.DB.prepare("UPDATE tasks SET status = 'done', progress = 100, progress_msg = NULL, error = NULL, updated_at = ? WHERE id = ?").bind(now(), id)];
     if (t.kind === 'transcribe' && Array.isArray(b.transcript)) {
       const segs = b.transcript
@@ -245,7 +328,16 @@ export async function handleEngine(request, env, path) {
       if (opts.auto_summary && segs.length) {
         const busy = await env.DB.prepare("SELECT id FROM tasks WHERE lecture_id = ? AND kind = 'summarize' AND status IN ('queued','running')").bind(l.id).first();
         if (!busy) stmts.push(env.DB.prepare("INSERT INTO tasks (kind, lecture_id, status, created_at, updated_at) VALUES ('summarize', ?, 'queued', ?, ?)").bind(l.id, now() + 1, now()));
+        const q = await queueQuiz(env, l.id);
+        if (q) stmts.push(q);
+        const bq = await queueFirstBank(env, l.id);
+        if (bq) stmts.push(bq);
       }
+    }
+    if (t.kind === 'quiz') {
+      const quiz = cleanQuiz(b.quiz);
+      if (quiz.items.length < 5) throw new HttpError(400, '확인 문제가 너무 적어요.');
+      stmts.push(env.DB.prepare('UPDATE lectures SET quiz = ?, updated_at = ? WHERE id = ?').bind(JSON.stringify(quiz), now(), l.id));
     }
     if (t.kind === 'summarize' && b.summary && typeof b.summary === 'object') {
       const sm = cleanSummary(b.summary);

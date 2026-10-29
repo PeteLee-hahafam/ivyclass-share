@@ -37,6 +37,114 @@ def split_sentences(text):
     return out
 
 
+_SMALL = {'a', 'an', 'the', 'of', 'in', 'on', 'at', 'to', 'for', 'and', 'or', 'but', 'nor', 'with', 'by', 'from', 'as', 'vs', 'into', 'about', 'than', 'via'}
+
+
+def _title_like(line):
+    """소제목처럼 생긴 줄: 12단어 이하, 마침표·쉼표로 끝나지 않고, 첫 글자가 대문자·숫자이며, 내용어 대부분이 대문자로 시작해요."""
+    t = clean(line)
+    words = t.split()
+    if not words or len(words) > 12 or not re.search(r'[A-Za-z]', t) or t[-1] in '.,;':
+        return False
+    if not re.match(r'["“‘(\[]?[A-Z0-9]', t):
+        return False
+    content = [re.sub(r'[^A-Za-z]', '', w) for w in words]
+    content = [w for w in content if w and w.lower() not in _SMALL]
+    if not content:
+        return False
+    caps = sum(1 for w in content if w[0].isupper())
+    if t[-1] in '?!':
+        return len(content) >= 2 and caps == len(content)
+    return caps / len(content) >= 0.7
+
+
+def noise_line(line):
+    """지문이 아닌 줄인지: 쪽·줄 번호만 있는 줄, * 로 시작하는 어휘 풀이, Q1. 같은 문제, 한글이 많은 줄. 이유 또는 ''"""
+    s = clean(line)
+    if not s:
+        return ''
+    if re.fullmatch(r'[-–—(\[]?\s*(?:p\.?|pp\.?|page)?\s*\d{1,4}\s*[-–—)\]]?', s, re.I):
+        return '쪽·줄 번호'
+    if s[0] in '*※':
+        return '어휘 풀이'
+    if re.match(r'(?:Q|Question)\s*\d+\s*[.):]', s, re.I):
+        return '문제'
+    han = len(re.findall(r'[가-힣]', s))
+    if han and han >= len(re.findall(r'[A-Za-z]', s)) * 0.5:
+        return '한글'
+    return ''
+
+
+def split_passage(text, dropped=None):
+    """지문을 문장으로 나누고, 따로 한 줄에 있는 소제목은 문장에서 떼어 그 뒤 첫 문장에 붙여요. [(소제목, 문장), ...]
+    '## '로 시작하는 줄은 소제목, 쪽 번호·어휘 풀이·한글 줄은 빼요(dropped 목록에 넣어요).
+    문장에 붙어 버린 소제목(줄바꿈·띄어쓰기 없이 이어진 것)은 Claude가 찾아 알려 줘요 (scriptgen)."""
+    raw = str(text or '').replace('\r\n', '\n').replace('\r', '\n')
+    lines = [clean(x) for x in raw.split('\n')]
+    keep = []
+    for x in lines:
+        why = noise_line(x) if not x.startswith('#') else ''
+        if why:
+            if dropped is not None:
+                dropped.append({'text': x[:160], 'why': why})
+            continue
+        keep.append(x)
+    lines = keep
+    blocks, head, buf = [], '', []
+    for i, line in enumerate(lines):
+        if not line:
+            continue
+        before = clean(' '.join(buf))
+        # '## 소제목': 선생님(새 강의 화면의 자료 정리)이 소제목이라고 표시한 줄
+        if line.startswith('#'):
+            h = clean(line.lstrip('#'))
+            if h:
+                if before:
+                    blocks.append((head, before))
+                    head = h
+                else:
+                    head = f'{head} · {h}' if head else h
+                buf = []
+            continue
+        nxt = next((x for x in lines[i + 1:] if x), '')
+        done = not before or re.search(r'[.!?]["”’)\]]*$', before)
+        if nxt and done and re.match(r'["“‘(\[]?[A-Z0-9]', nxt) and _title_like(line):
+            if before:
+                blocks.append((head, before))
+                head = line
+            else:
+                head = f'{head} · {line}' if head else line
+            buf = []
+            continue
+        buf.append(line)
+    blocks.append((head, clean(' '.join(buf))))
+    out = []
+    for h, body in blocks:
+        sents = split_sentences(body)
+        if not sents:
+            if h:
+                out.append(('', h))  # 소제목만 남으면 문장으로 둬요
+            continue
+        out.append((h, sents[0]))
+        out.extend(('', x) for x in sents[1:])
+    return out
+
+
+def strip_heading(sentence, heading):
+    """문장 맨 앞에 붙은 소제목을 떼어요 (띄어쓰기 없이 붙어 있어도). 떼면 (소제목, 나머지 문장), 아니면 None."""
+    h = clean(heading)
+    s = clean(sentence)
+    if not h or not s or len(h.split()) > 15 or h[-1] in '.,;':
+        return None
+    norm = lambda x: re.sub(r'[’‘`]', "'", x).replace('“', '"').replace('”', '"').lower()
+    if not norm(s).startswith(norm(h)):
+        return None
+    rest = s[len(h):].lstrip(' :-–—·')
+    if len(rest.split()) < 3 or not re.match(r'["“‘(\[]?[A-Z0-9]', rest):
+        return None
+    return s[:len(h)].strip(), rest
+
+
 def split_korean(text):
     t = clean(text)
     if not t:
@@ -283,4 +391,26 @@ def time_map(text, dur, align=None, lead=0.06, tail=0.12):
         p = max(0, min(n, int(p)))
         return lead + body * cum[p] / total
 
+    return g
+
+
+# ---------------------------------------------------------------- 강의 학년
+# 사이트가 학년 키(mid1 …)나 학년 이름(중학교 1학년)을 보내요. 둘 다 알아들어요.
+LEVELS = {'mid1': '중학교 1학년', 'mid2': '중학교 2학년', 'mid3': '중학교 3학년', 'high1': '고등학교 1학년', 'high2': '고등학교 2학년', 'high3': '고등학교 3학년(수능 대비)'}
+
+
+def level_text(opts, default='고등학교 1학년'):
+    v = str((opts or {}).get('level') or '').strip()
+    return LEVELS.get(v, v or default)
+
+
+def level_guide(opts):
+    """확인 문제와 문제 은행에 줄 학년 안내 (학년을 모르면 빈 글)"""
+    t = level_text(opts, '')
+    if not t:
+        return ''
+    g = f'[학생 학년] {t}. 이 학년 학교 시험에 나오는 수준과 말투로 낸다.'
+    if t.startswith('중학교'):
+        g += (' 중학생이니 발문, 보기, 해설은 짧고 쉬운 우리말로 쓰고, 문법 용어는 교과서에 나오는 말만 쓴다.'
+              ' 보기의 영어 낱말과 표현도 이 학년이 아는 수준으로 하고, 수능형 고난도 추론 문제는 내지 않는다.')
     return g

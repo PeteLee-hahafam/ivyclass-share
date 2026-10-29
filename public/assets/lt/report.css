@@ -1,0 +1,303 @@
+/* 어머니께 보내는 영어 레벨테스트 리포트 (A4 세 장)
+   서버(src/lt/core.js ltReport2HTML)가 만든 HTML에 입혀요. 선생님 결과 화면도 리포트 부품(rp-...)을 같이 써요.
+   리포트는 밝은 배색(흰 바탕, 연한 민트 띠, 초록은 레벨과 그래프)이에요. 색은 .rp 안에서만 바꿔요. */
+.rp {
+  --board: #1e7f5c;
+  --board-2: #186a4c;
+  --board-deep: #124d38;
+  --band: #eaf5ef;
+  --band-line: #cfe4d8;
+  --board-line: rgba(243, 242, 234, 0.18);
+  --chalk: #f3f2ea;
+  --chalk-2: rgba(243, 242, 234, 0.76);
+  --chalk-3: rgba(243, 242, 234, 0.42);
+  --yellow: #f0c04a;
+  --yellow-soft: #fbf1d0;
+  --yellow-ink: #6e5000;
+  --paper: #f5f8f7;
+  --surface: #ffffff;
+  --ink: #17201b;
+  --ink-2: #3b4640;
+  --muted: #646e68;
+  --faint: #9ea7a1;
+  --line: #e1e5e0;
+  --line-2: #edf0ec;
+  --green: #1e7f5c;
+  --green-soft: #e3f3ea;
+  --coral: #c4513a;
+  --coral-soft: #fbebe6;
+  --slate: #3e5f75;
+  --slate-soft: #e8eef2;
+  --font: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+  --serif: 'LT Serif', 'Noto Serif', Georgia, 'Times New Roman', serif;
+  --hand: 'Gaegu', var(--font);
+  --dust: none;
+}
+.rp { background: var(--surface); color: var(--ink); font-family: var(--font); line-height: 1.6; word-break: keep-all; overflow-wrap: anywhere; }
+.rp .num { font-variant-numeric: tabular-nums; }
+.rp h2, .rp h3 { text-wrap: balance; }
+
+.rp-band { background: var(--board) var(--dust); color: var(--chalk); padding: 18px 20px 14px; }
+.rp-band-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; color: var(--chalk-2); }
+.rp-acad { font-weight: 600; letter-spacing: 0.01em; }
+.rp-ribbon { font-size: 11px; font-weight: 600; color: var(--board-deep); background: var(--chalk); border-radius: 99px; padding: 1px 9px; }
+.rp-title { margin: 8px 0 0; font-size: 21px; font-weight: 800; letter-spacing: -0.01em; }
+.rp-who { margin: 2px 0 0; font-size: 14px; color: var(--chalk-2); display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.rp-who b { font-size: 16px; color: var(--chalk); font-weight: 700; }
+.rp-school { color: var(--chalk-3); }
+.rp-hero { display: flex; align-items: center; gap: 16px; margin: 16px 0 4px; }
+.rp-lv { flex: none; display: grid; justify-items: center; min-width: 96px; padding: 6px 12px 4px; border: 1.5px solid var(--board-line); border-radius: 14px; background: rgba(20, 42, 33, 0.35); }
+.rp-lv small { font-size: 11.5px; color: var(--chalk-2); }
+.rp-lv strong { font-family: var(--hand); font-weight: 700; font-size: 54px; line-height: 1.02; color: var(--yellow); }
+.rp-hero-t { min-width: 0; }
+.rp-hl { margin: 0; font-size: 17px; font-weight: 700; line-height: 1.45; text-wrap: balance; }
+.rp-cmp { margin: 5px 0 0; display: inline-block; font-size: 13px; font-weight: 600; color: var(--board-deep); background: var(--yellow); border-radius: 99px; padding: 2px 10px; }
+.rp-stair { margin-top: 14px; }
+.rp-stair-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.st-on { fill: var(--yellow); opacity: 0.45; }
+.st-top { fill: var(--yellow); }
+.st-off { fill: none; stroke: var(--chalk-3); stroke-width: 1; stroke-dasharray: 3 3; }
+.st-lb { fill: var(--chalk-2); font-size: 9.5px; font-family: var(--font); }
+.st-g { fill: var(--chalk); font-weight: 700; }
+.st-r { fill: var(--yellow); font-weight: 800; }
+.st-tri { fill: var(--chalk); }
+.rp-legend { display: flex; gap: 14px; flex-wrap: wrap; margin: 6px 0 0; font-size: 11.5px; color: var(--chalk-2); }
+.rp-legend i { display: inline-block; vertical-align: -1px; margin-right: 5px; }
+.lg-lv { width: 10px; height: 10px; border-radius: 2px; background: var(--yellow); }
+.lg-g { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 8px solid var(--chalk); }
+
+.rp-sec { padding: 16px 20px; border-top: 1px solid var(--line-2); }
+.rp-sec h3 { margin: 0 0 8px; font-size: 15.5px; font-weight: 800; color: var(--ink); }
+.rp-sub { margin: -2px 0 10px; font-size: 12.5px; color: var(--muted); }
+.rp-sub .rp-dot { margin-right: 8px; }
+
+.rp-facts dl { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; }
+.rp-facts dt { font-size: 12px; color: var(--muted); }
+.rp-facts dd { margin: 1px 0 0; font-size: 15px; font-weight: 700; }
+.rp-facts dd small { display: block; font-size: 11.5px; font-weight: 500; color: var(--muted); }
+.rp-facts dd small.in { display: inline; margin-left: 4px; }
+.rp-speed { margin: 12px 0 0; padding: 9px 12px; border-radius: 10px; background: var(--paper); font-size: 13px; color: var(--ink-2); }
+
+.rp-skills { display: grid; gap: 0; }
+.rp-skill { padding: 10px 0 11px; border-bottom: 1px dashed var(--line); min-width: 0; }
+.rp-skill:last-child { border-bottom: 0; }
+.rp-skill-h { display: flex; align-items: center; gap: 4px 8px; flex-wrap: wrap; }
+.rp-skill-h b { font-size: 14.5px; }
+.rp-skill-c { margin-left: auto; font-size: 12px; color: var(--muted); }
+.rp-chip { font-size: 11.5px; font-weight: 700; padding: 1px 8px; border-radius: 99px; line-height: 1.6; }
+.rp-chip.strong { background: var(--green-soft); color: var(--green); }
+.rp-chip.ok { background: var(--slate-soft); color: var(--slate); }
+.rp-chip.work { background: var(--coral-soft); color: var(--coral); }
+.rp-chip.next { background: var(--yellow-soft); color: var(--yellow-ink); }
+.rp-chip.none { background: var(--line-2); color: var(--muted); }
+.rp-skill-d { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
+.rp-dots { display: flex; flex-wrap: wrap; gap: 2px 10px; margin-left: auto; }
+.rp-dot { font-size: 11.5px; color: var(--ink-2); white-space: nowrap; }
+.rp-dot i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: -0.5px; box-sizing: border-box; }
+.rp-dot.ok i { background: var(--green); }
+.rp-dot.no i { border: 1.8px solid var(--coral); background: var(--surface); }
+.rp-skill-n { margin: 4px 0 0; font-size: 12.5px; color: var(--ink-2); }
+
+.rp-path-svg { display: block; width: 100%; height: auto; }
+.pc-grid { stroke: var(--line-2); stroke-width: 1; }
+.pc-band { fill: var(--yellow-soft); }
+.pc-y { fill: var(--muted); font-size: 8.5px; font-family: var(--font); }
+.pc-yr { fill: var(--yellow-ink); font-weight: 800; }
+.pc-grade { stroke: var(--slate); stroke-width: 1.2; stroke-dasharray: 4 3; }
+.pc-gl { fill: var(--slate); font-size: 8.5px; font-weight: 700; font-family: var(--font); paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
+.pc-line { fill: none; stroke: var(--ink-2); stroke-width: 1.4; stroke-linejoin: round; }
+.pc-ok { fill: var(--green); stroke: var(--surface); stroke-width: 1.5; }
+.pc-no { fill: var(--surface); stroke: var(--coral); stroke-width: 2; }
+.pc-sc { fill: var(--ink); font-size: 9.5px; font-weight: 700; font-family: var(--font); paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
+.pc-sc.no { fill: var(--coral); }
+.pc-x { fill: var(--muted); font-size: 8.5px; font-family: var(--font); }
+.rp-legend2 { display: flex; gap: 12px; flex-wrap: wrap; margin: 4px 0 0; font-size: 11.5px; color: var(--muted); }
+.rp-legend2 i { display: inline-block; vertical-align: -1px; margin-right: 5px; box-sizing: border-box; }
+.lg-ok { width: 10px; height: 10px; border-radius: 50%; background: var(--green); }
+.lg-no { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--coral); }
+.lg-band { width: 16px; height: 9px; border-radius: 2px; background: var(--yellow-soft); border: 1px solid #ecd9a0; }
+.lg-grade { width: 16px; height: 0; border-top: 1.5px dashed var(--slate); vertical-align: 3px !important; }
+
+.rp-note { background: var(--yellow-soft); border-top-color: #efe1b6; }
+.rp-comment { margin: 0; font-size: 14px; line-height: 1.75; color: var(--ink); }
+.rp-sign { margin: 10px 0 0; text-align: right; font-weight: 600; font-size: 13px; color: var(--yellow-ink); }
+
+.rp-rec { margin: 0 0 10px; font-size: 13px; color: var(--muted); display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.rp-rec b { font-size: 15px; color: var(--board); }
+.rp-plan { margin: 0; padding: 0; list-style: none; counter-reset: p; display: grid; gap: 9px; }
+.rp-plan li { counter-increment: p; display: grid; grid-template-columns: 22px 1fr; column-gap: 8px; font-size: 13px; color: var(--ink-2); }
+.rp-plan li::before { content: counter(p); grid-row: span 2; width: 20px; height: 20px; border-radius: 50%; background: var(--board); color: var(--chalk); font-size: 11.5px; font-weight: 700; display: grid; place-items: center; margin-top: 1px; }
+.rp-plan b { color: var(--ink); font-size: 13.5px; }
+
+.rp-tablewrap { overflow-x: auto; }
+.rp-levels summary { cursor: pointer; color: var(--green); font-weight: 700; font-size: 13.5px; }
+.rp-levels[open] summary { margin-bottom: 8px; }
+@media (max-width: 480px) { .rp:not(.print) .rp-table th:first-child, .rp:not(.print) .rp-table td:first-child { display: none; } .rp:not(.print) .rp-table td:nth-child(3) { white-space: normal; } }
+.rp-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.rp-table th { text-align: left; font-weight: 600; color: var(--muted); font-size: 11.5px; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.rp-table td { padding: 5px 6px; border-bottom: 1px solid var(--line-2); vertical-align: top; color: var(--ink-2); }
+.rp-table td:first-child { color: var(--muted); width: 26px; }
+.rp-table td:nth-child(2) { white-space: nowrap; }
+.rp-table td:nth-child(3) { white-space: nowrap; }
+.rp-table em { font-style: normal; font-size: 10.5px; font-weight: 700; margin-left: 5px; padding: 0 5px; border-radius: 4px; background: var(--yellow); color: var(--board-deep); }
+.rp-table em.g { background: var(--slate-soft); color: var(--slate); }
+.rp-table tr.is-lv td { background: var(--yellow-soft); color: var(--ink); }
+
+.rp-foot { padding: 14px 20px 18px; background: var(--paper); font-size: 11.5px; color: var(--muted); display: grid; gap: 5px; }
+.rp-foot p { margin: 0; }
+.rp-foot b { color: var(--ink-2); }
+
+/* A4 두 장 (PDF) */
+.rp.print { width: 210mm; }
+.rp-sheet { position: relative; width: 210mm; height: 297mm; overflow: hidden; display: flex; flex-direction: column; break-after: page; page-break-after: always; background: var(--surface); }
+.rp-sheet:last-child { break-after: auto; page-break-after: auto; }
+.rp.print .rp-band { padding: 11mm 14mm 6mm; }
+.rp.print .rp-band-main { display: grid; grid-template-columns: minmax(0, 1fr) 84mm; column-gap: 9mm; align-items: end; }
+.rp.print .rp-title { font-size: 23px; }
+.rp.print .rp-hero { margin: 12px 0 2px; }
+.rp.print .rp-lv strong { font-size: 58px; }
+.rp.print .rp-hl { font-size: 18px; }
+.rp.print .rp-stair { margin-top: 0; }
+.rp.print .rp-body { flex: 1; display: flex; flex-direction: column; }
+.rp.print .rp-sec { padding: 4mm 14mm; }
+.rp.print .rp-facts dl { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.rp.print .rp-speed { margin-top: 9px; padding: 7px 11px; }
+.rp.print .rp-skills { grid-template-columns: 1fr 1fr; column-gap: 9mm; }
+.rp.print .rp-skill { padding: 8px 0 9px; }
+.rp.print .rp-skill:nth-last-child(2) { border-bottom: 0; }
+.rp.print .rp-pathsec .rp-sub { margin-bottom: 4px; }
+.rp.print .rp-foot { margin-top: auto; padding: 5mm 14mm 13mm; }
+.rp-mini { display: flex; justify-content: space-between; margin: 0 14mm; padding: 11mm 0 3mm; font-size: 11.5px; color: var(--muted); border-bottom: 2px solid var(--board); }
+.rp-pno { position: absolute; right: 14mm; bottom: 6mm; font-size: 10px; color: var(--faint); }
+
+/* 다섯 영역 */
+.rp.v2 .rp-band-main { display: grid; gap: 14px; }
+.rp-cefr { margin: 6px 0 0; font-size: 12.5px; color: var(--chalk-2); }
+.rp-cefr b { color: var(--chalk); font-size: 14px; margin-left: 3px; }
+.rp-idx { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.rp-idx-t { border: 1px solid var(--board-line); border-radius: 11px; padding: 8px 11px; background: rgba(20, 42, 33, 0.35); display: grid; gap: 1px; min-width: 0; }
+.rp-idx-t span { font-size: 11.5px; color: var(--chalk-2); }
+.rp-idx-t b { font-size: 17px; color: var(--yellow); font-weight: 800; letter-spacing: -0.01em; }
+.rp-idx-t small { font-size: 11px; color: var(--chalk-3); }
+.rp-idx-note { margin: 6px 0 0; font-size: 11px; color: var(--chalk-3); }
+
+.rp-ladder-svg { display: block; width: 100%; height: auto; }
+.ld-ax { fill: var(--muted); font-size: 9px; font-family: var(--font); }
+.ld-ax.g { fill: var(--slate); font-weight: 800; }
+.ld-name { fill: var(--ink); font-size: 12px; font-weight: 700; font-family: var(--font); }
+.ld-lv { fill: var(--ink); font-size: 12px; font-weight: 800; font-family: var(--font); }
+.ld-on { fill: var(--board); opacity: 0.72; }
+.ld-top { fill: var(--board); }
+.ld-off { fill: var(--line-2); }
+.ld-g { stroke: var(--slate); stroke-width: 1.4; stroke-dasharray: 4 3; }
+.lg-ld { width: 16px; height: 9px; border-radius: 2px; background: var(--board); }
+.rp-mods { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 6px; }
+.rp-mods li { display: grid; grid-template-columns: 52px 40px 46px minmax(0, 1fr); gap: 6px; align-items: baseline; font-size: 13px; color: var(--ink-2); padding-bottom: 6px; border-bottom: 1px dashed var(--line); }
+.rp-mods li:last-child { border-bottom: 0; }
+.rp-mods b { color: var(--ink); }
+.rp-mods .lv { font-weight: 800; color: var(--board); }
+.rp-mods .cf { font-size: 12px; color: var(--muted); }
+
+.rp-mod h3 { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.rp-mod h3 span { font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.rp-skills.mini { grid-template-columns: 1fr; }
+.rp-skills.mini .rp-skill-d { display: none; }
+.rp-skills.mini .rp-skill { padding: 6px 0 7px; }
+.rp-skills.mini .rp-skill-n { font-size: 12px; margin-top: 2px; }
+
+.rp-vbars { display: grid; gap: 4px; }
+.rp-vb { display: grid; grid-template-columns: 92px minmax(0, 1fr) 38px; gap: 8px; align-items: center; font-size: 11.5px; color: var(--ink-2); }
+.rp-vb i { height: 9px; border-radius: 99px; background: var(--line-2); overflow: hidden; display: block; }
+.rp-vb i b { display: block; height: 100%; background: var(--board); border-radius: 99px; }
+.rp-vb.un i b { background: #9db3a7; }
+.rp-vb em { font-style: normal; text-align: right; font-weight: 700; }
+.rp-vb.un em { color: var(--muted); font-weight: 500; }
+
+.rp-pts { display: grid; gap: 8px; }
+.rp-pts > div { display: flex; flex-wrap: wrap; gap: 5px; align-items: baseline; }
+.rp-pts em { font-style: normal; font-size: 12px; font-weight: 700; color: var(--muted); width: 64px; flex: none; }
+.pt { font-size: 12px; padding: 2px 8px; border-radius: 6px; background: var(--line-2); color: var(--ink-2); }
+.pt.ok { background: var(--green-soft); color: var(--green); }
+.pt.no { background: var(--coral-soft); color: var(--coral); }
+
+.rp-rub { display: grid; gap: 5px; margin-bottom: 8px; }
+.rp-rb { display: grid; grid-template-columns: 64px auto 26px; gap: 8px; align-items: center; font-size: 12.5px; color: var(--ink-2); justify-content: start; }
+.rp-rb i { display: flex; gap: 3px; }
+.rp-rb i b { width: 22px; height: 9px; border-radius: 3px; background: var(--line-2); }
+.rp-rb i b.on { background: var(--board); }
+.rp-rb em { font-style: normal; font-weight: 800; }
+.rp-fix { margin: 4px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 12.5px; }
+.rp-fix s { color: var(--coral); text-decoration-thickness: 1.5px; }
+.rp-fix b { color: var(--green); }
+.rp-fix small { color: var(--muted); margin-left: 4px; }
+.rp-wsum { margin: 8px 0 0; font-size: 12.5px; color: var(--ink-2); background: var(--paper); border-radius: 9px; padding: 8px 11px; }
+
+.rp-books { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+.rp-books li { border: 1px solid var(--line); border-radius: 11px; padding: 9px 12px; }
+.rp-books .bh { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.rp-books .bh b { font-size: 14px; }
+.rp-books .bh .lv { font-size: 12px; font-weight: 800; color: var(--board); }
+.rp-books .bh .bk { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--board-deep); background: var(--yellow-soft); border-radius: 6px; padding: 1px 8px; }
+.rp-books p { margin: 4px 0 0; font-size: 12.5px; color: var(--ink-2); }
+.rp-table.t2 td:nth-child(1) { white-space: nowrap; }
+.rp-table.t2 td:nth-child(2) { white-space: normal; }
+.rp-table.t2 td:first-child { width: auto; color: var(--ink-2); }
+
+/* PDF 세 장 */
+.rp.v2.print .rp-band-main { grid-template-columns: minmax(0, 1fr) 88mm; column-gap: 9mm; align-items: end; }
+.rp.v2.print .rp-ladder { max-width: 182mm; }
+.rp.v2.print .rp-mods li { grid-template-columns: 64px 46px 56px minmax(0, 1fr); font-size: 13px; }
+.rp.v2.print .s2 .rp-body { display: grid; grid-template-columns: 1fr 1fr; align-content: start; }
+.rp.v2.print .s2 .rp-mod { border-top: 1px solid var(--line-2); }
+.rp.v2.print .s2 .rp-mod:first-child { grid-row: span 2; }
+.rp.v2.print .s3 .rp-body { display: flex; flex-direction: column; }
+.rp.v2.print .rp-books { grid-template-columns: 1fr 1fr; }
+.rp.v2.print .s1 .rp-note { margin-top: auto; }
+.rp.v2.print .rp-table { font-size: 11.5px; }
+.rp.v2.print .rp-table td { padding: 4px 6px; }
+
+.rp.v2.print .s1 .rp-note { padding-bottom: 11mm; }
+.rp.v2.print .rp-mods { gap: 4px; margin-top: 8px; }
+.rp.v2.print .rp-mods li { padding-bottom: 4px; }
+
+/* 밝은 배색: 어두운 칠판 띠 대신 연한 민트 띠. 초록은 레벨과 그래프에, 노란색은 학년 비교 표시에만 써요.
+   칠판 위 분필색(chalk)을 쓰던 곳은 밝은 띠 안에서 진한 글자색으로 바꿔 읽혀요. */
+.rp .rp-band {
+  --chalk: var(--ink);
+  --chalk-2: var(--ink-2);
+  --chalk-3: var(--muted);
+  --board-line: var(--band-line);
+  --board-2: var(--surface);
+  background: var(--band);
+  color: var(--ink);
+  border-top: 5px solid var(--board);
+}
+.rp-band-top { align-items: center; }
+.rp-acad { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); font-size: 15px; font-weight: 800; letter-spacing: -0.01em; }
+.rp-logo { height: 54px; width: 54px; object-fit: contain; display: block; flex: none; }
+.rp-band-r2 { display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-left: auto; }
+.rp-tel { font-size: 13px; color: var(--ink-2); white-space: nowrap; text-decoration: none; }
+.rp-tel b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.rp-ribbon { background: var(--surface); color: var(--muted); border: 1px solid var(--band-line); }
+.rp-lv, .rp-idx-t { background: var(--surface); border-color: var(--band-line); }
+.rp-lv strong { color: var(--board); }
+.rp-idx-t b { color: var(--board); }
+.rp-cmp { background: var(--yellow); color: #4a3700; }
+.rp-sign { color: var(--board-deep); }
+
+/* 둘째, 셋째 장 머리 */
+.rp-mini { align-items: center; }
+.rp-mini-l { display: inline-flex; align-items: center; gap: 8px; }
+.rp-mini img { height: 9mm; width: 9mm; object-fit: contain; }
+
+/* PDF: 로고를 왼쪽 위에, 워터마크는 A4 정중앙 (한 변이 A4 세로의 절반인 정사각형, 흐리게) */
+.rp.print .rp-band { padding-top: 5.5mm; }
+.rp.print .rp-foot { padding-bottom: 11mm; }
+.rp.print .rp-logo { height: 17mm; width: 17mm; }
+.rp.print .rp-acad { font-size: 16px; gap: 3.5mm; }
+.rp.print .rp-title { margin-top: 3mm; }
+.rp-water { position: absolute; left: 50%; top: 50%; width: 148.5mm; height: 148.5mm; transform: translate(-50%, -50%); opacity: 0.1; mix-blend-mode: multiply; pointer-events: none; z-index: 6; }
+.rp-water img { display: block; width: 100%; height: 100%; object-fit: contain; }
+@media (max-width: 560px) {
+  .rp-logo { height: 46px; width: 46px; }
+}

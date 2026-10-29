@@ -1,14 +1,15 @@
 // 올리기 전에 자바스크립트 파일에 문법 오류가 없는지 확인해요: npm run check
 import { execFileSync } from 'node:child_process';
-import { readdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const dirs = ['src', 'scripts', 'public/assets', 'public'];
+const dirs = ['src', 'src/lt', 'scripts', 'public/assets', 'public/assets/lt', 'public'];
 let bad = 0;
 let n = 0;
 for (const d of dirs) {
+  if (!existsSync(join(root, d))) continue;
   for (const name of readdirSync(join(root, d))) {
     const p = join(root, d, name);
     if (!statSync(p).isFile() || !/\.(m?js)$/.test(name)) continue;

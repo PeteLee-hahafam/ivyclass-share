@@ -65,7 +65,7 @@ class Cloud:
 
     def next_job(self):
         """(강의 작업, 자막·요약 작업) 중 하나를 받아요."""
-        r = self._req('POST', '/api/engine/next', json={})
+        r = self._req('POST', '/api/engine/next', json={'kinds': ['transcribe', 'summarize', 'quiz', 'bank', 'read', 'ltwrite']})
         return r.get('job'), r.get('task')
 
     def progress(self, lid, pct, msg, force=False):
@@ -132,6 +132,18 @@ class Cloud:
         except requests.RequestException as e:
             raise CloudError(f'영상을 받는 중에 연결이 끊겼어요 ({e.__class__.__name__}).')
         return path
+
+    def material(self, mid):
+        """선생님이 올린 자료 파일(교과서 사진·PDF, 문제 자료)을 받아요."""
+        try:
+            r = self.s.get(f'{self.origin}/api/engine/materials/{int(mid)}/file', timeout=(20, 180))
+        except requests.RequestException as e:
+            raise CloudError(f'자료 파일을 받지 못했어요 ({e.__class__.__name__}).')
+        if r.status_code == 404:
+            raise LectureGone('자료 파일이 없어요. 선생님이 지웠을 수 있어요.', 404, 'gone')
+        if r.status_code >= 400:
+            raise CloudError(f'자료 파일을 받지 못했어요 ({r.status_code}).', r.status_code)
+        return r.content
 
     # ------------------------------------------------------------ 학생 이름 목소리
     def names_missing(self):

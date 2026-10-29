@@ -7,14 +7,19 @@ import {
 } from './ui.js';
 import { StudentApp } from './student.js';
 import { Player } from './player.js';
+import { QuizItem, AREA, isOk } from './quizview.js';
+import { HomeworkCard, MockCard, MaterialsCard, uploadMaterial } from './bankcards.js';
 import { mountBoard, VIEW_LABEL, normalizeStyle, STYLE_PRESETS, DEFAULT_STYLE } from './board.js';
 import { DEMO_SCRIPT } from './board-demo.js';
 import { Editor } from './editor.js';
+import { prepareMaterial, outline, planParts, splitTranslation, noiseLine } from './material.js';
+import { DuePicker, ymd, daysLater, endOfDay } from './due.js';
+import { ExamsPage, ExamBuilder, ExamDetail, ClassScores } from './exams.js';
 
 const WORKING = ['queued', 'scripting', 'render_queued', 'rendering'];
 const NAV = [['/', '오늘', 'today', 'home'], ['/lectures', '강의', 'lectures', 'library'], ['/classes', '반', 'classes', 'users'], ['/settings', '설정', 'settings', 'settings']];
-const SECTION = { '': 'today', lectures: 'lectures', new: 'lectures', lecture: 'lectures', review: 'lectures', edit: 'lectures', classes: 'classes', settings: 'settings' };
-const TITLES = { '': '오늘', lectures: '강의', new: '새 강의', lecture: '강의', review: '검수', edit: '강의 편집', classes: '반', settings: '설정' };
+const SECTION = { '': 'today', lectures: 'lectures', new: 'lectures', lecture: 'lectures', review: 'lectures', edit: 'lectures', exams: 'lectures', classes: 'classes', settings: 'settings' };
+const TITLES = { '': '오늘', lectures: '강의', new: '새 강의', lecture: '강의', review: '검수', edit: '강의 편집', exams: '시험', classes: '반', settings: '설정' };
 
 function engineOnline(last) {
   return !!last && Date.now() / 1000 - last < 150;
@@ -43,22 +48,24 @@ export function callPreview(name) {
   return isH(last) ? given + ((last.charCodeAt(0) - 0xac00) % 28 ? '아' : '야') : given;
 }
 
+// 아직 안 끝낸 학생 이름과 남은 것: 김하준(숙제), 이서윤(강의, 숙제). 숙제가 없는 강의는 이름만
+function missText(p, st) {
+  if (!st || st.hw == null) return p.name;
+  const left = [!p.watched ? '강의' : '', !p.hw ? '숙제' : ''].filter(Boolean);
+  return left.length ? `${p.name}(${left.join(', ')})` : p.name;
+}
+
 // 단톡방에 붙여 넣을 과제 알림
 function reminderText(a, academy) {
-  const names = ((a.stats && a.stats.pending) || []).map((p) => p.name);
-  const lines = [`[${academy}] ${a.class_name} 강의 과제 안내`, `「${a.title}」 강의를 ${a.due_at ? `${fmtDate(a.due_at)}까지 ` : ''}끝까지 봐 주세요.`];
-  if (names.length) lines.push(`아직 다 보지 않은 학생: ${names.join(', ')}`);
+  const st = a.stats || {};
+  const names = (st.pending || []).map((p) => missText(p, st));
+  const what = st.hw != null ? '끝까지 보고 숙제까지 내 주세요' : '끝까지 봐 주세요';
+  const lines = [`[${academy}] ${a.class_name} 강의 과제 안내`, `「${a.title}」 강의를 ${a.due_at ? `${fmtDate(a.due_at)}까지 ` : ''}${what}.`];
+  if (names.length) lines.push(`아직 끝내지 않은 학생: ${names.join(', ')}`);
   lines.push(`강의실: ${location.origin}`);
   return lines.join('\n');
 }
 
-const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-const daysLater = (n) => {
-  const d = new Date();
-  d.setDate(d.getDate() + n);
-  return ymd(d);
-};
-const endOfDay = (s) => Math.floor(new Date(`${s}T23:59:00`).getTime() / 1000);
 
 // ---------------------------------------------------------------- 어디서나 여는 과제 내기 창
 let assignSetter = null;
@@ -128,11 +135,18 @@ export function TeacherApp({ info, me, onLogout, onInfo }) {
   else if (p1 === 'lecture') page = html`<${LectureDetail} id=${parts[2]} key=${parts[2]} info=${info} />`;
   else if (p1 === 'review') page = html`<${Review} id=${parts[2]} key=${parts[2]} />`;
   else if (p1 === 'edit') page = html`<${Editor} id=${parts[2]} key=${parts[2]} />`;
-  else if (p1 === 'classes') page = html`<${ClassHub} sel0=${parts[2]} tab0=${parts[3] || query.get('tab')} qs=${qs} info=${info} />`;
+  else if (p1 === 'exams') {
+    if (parts[2] === 'new') page = html`<${ExamBuilder} key=${`new${qs}`} lectureId=${query.get('l')} fromId=${query.get('from')} />`;
+    else if (/^\d+$/.test(parts[2] || '') && parts[3] === 'edit') page = html`<${ExamBuilder} key=${`edit${parts[2]}`} editId=${parts[2]} />`;
+    else if (/^\d+$/.test(parts[2] || '')) page = html`<${ExamDetail} id=${parts[2]} key=${parts[2]} />`;
+    else page = html`<${ExamsPage} />`;
+  }
+  else if (p1 === 'classes') page = html`<${ClassHub} sel0=${parts[2]} tab0=${parts[3] || query.get('tab')} qs=${qs} info=${info} ltNew=${lite && lite.counts ? lite.counts.lt_new || 0 : 0} />`;
   else if (p1 === 'settings') page = html`<${SettingsPage} section=${parts[2] || 'academy'} rc=${query.get('rc')} info=${info} me=${me} onInfo=${onInfo} onLogout=${onLogout} />`;
   else page = html`<div class="page"><${Empty} title="없는 화면이에요" action=${html`<${Btn} onClick=${() => go('/')}>오늘로</${Btn}>`} /></div>`;
 
   const review = lite && lite.counts ? lite.counts.review : 0;
+  const ltNew = lite && lite.counts ? lite.counts.lt_new || 0 : 0;
   const eng = lite && lite.engine;
   const on = eng && engineOnline(eng.last_seen);
   const engTitle = !eng ? '제작 엔진' : on ? `제작 엔진 켜짐: ${(eng.info && eng.info.host) || '학원 PC'}` : eng.connected ? `제작 엔진 꺼짐, 마지막 연결 ${ago(eng.last_seen)}` : '제작 엔진 연결 전';
@@ -142,7 +156,7 @@ export function TeacherApp({ info, me, onLogout, onInfo }) {
         <a class="tb-brand" href="#/" aria-label=${`${info.app_name}, 오늘`}><span class="mark">${info.logo_url ? html`<img src=${info.logo_url} alt="" />` : html`<${Icon} name="penLine" size="sm" />`}</span><span class="bt">${info.app_name}</span></a>
         <span class="tb-title">${TITLES[p1] || info.app_name}</span>
         <nav class="tb-nav" aria-label="메뉴">${NAV.map(([p, label, key]) => html`<a href=${'#' + p} class=${sec === key ? 'on' : ''} aria-current=${sec === key ? 'page' : undefined}>${label}
-          ${key === 'lectures' && review > 0 && html`<span class="badge num" title=${`검수 대기 ${review}개`}>${review}</span>`}${sec === key && html`<${ChalkLine} key=${route.split('/')[1] || 'today'} />`}</a>`)}</nav>
+          ${key === 'lectures' && review > 0 && html`<span class="badge num" title=${`검수 대기 ${review}개`}>${review}</span>`}${key === 'classes' && ltNew > 0 && html`<span class="badge num" title=${`새 레벨테스트 결과 ${ltNew}개`}>${ltNew}</span>`}${sec === key && html`<${ChalkLine} key=${route.split('/')[1] || 'today'} />`}</a>`)}</nav>
         <span class="spacer hide-m"></span>
         <button class="tb-search" onClick=${() => setPalette(true)} aria-label="찾기" title=${`찾기 (${MOD_KEY} K)`}><${Icon} name="search" size="sm" /><span>강의, 반, 학생 찾기</span><kbd>${MOD_KEY} K</kbd></button>
         <a class="btn chalk sm tb-new" href="#/new"><${Icon} name="plus" size="sm" />새 강의</a>
@@ -154,7 +168,7 @@ export function TeacherApp({ info, me, onLogout, onInfo }) {
     <nav class="t-tabs" aria-label="메뉴">
       ${NAV.slice(0, 2).map(([p, label, key, ic]) => html`<a href=${'#' + p} class=${sec === key ? 'on' : ''}><${Icon} name=${ic} size="lg" />${label}${key === 'lectures' && review > 0 && html`<span class="tb-badge num">${review}</span>`}</a>`)}
       <a class="plus" href="#/new" aria-label="새 강의"><span><${Icon} name="plus" size="lg" /></span></a>
-      ${NAV.slice(2).map(([p, label, key, ic]) => html`<a href=${'#' + p} class=${sec === key ? 'on' : ''}><${Icon} name=${ic} size="lg" />${label}</a>`)}
+      ${NAV.slice(2).map(([p, label, key, ic]) => html`<a href=${'#' + p} class=${sec === key ? 'on' : ''}><${Icon} name=${ic} size="lg" />${label}${key === 'classes' && ltNew > 0 && html`<span class="tb-badge num">${ltNew}</span>`}</a>`)}
     </nav>
     ${palette && html`<${Palette} onClose=${() => setPalette(false)} onLogout=${onLogout} />`}
     <${AssignHost} />
@@ -224,6 +238,10 @@ function Palette({ onClose, onLogout }) {
     { icon: 'userPlus', label: '학생 넣기', to: () => go(`/classes?add=${Date.now()}`) },
     { icon: 'plus', label: '반 만들기', to: () => go(`/classes?new=${Date.now()}`) },
     { icon: 'chart', label: '시청표 보기', hint: '학생마다 강의를 얼마나 봤는지', to: '/classes?tab=watch' },
+    { icon: 'clipboardCheck', label: '시험 만들기', hint: '확인 문제와 문제 은행에서 골라 시험지를 만들어요', to: '/exams/new' },
+    { icon: 'list', label: '시험 목록', hint: '만든 시험, 인쇄, 반에 내기, 결과', to: '/exams' },
+    { icon: 'trophy', label: '성적 보기', hint: '반 학생들의 확인 문제, 숙제, 시험 점수', to: '/classes?tab=scores' },
+    { icon: 'clipboard', label: '레벨테스트', hint: '시험 링크 보내기, 결과와 리포트', to: '/classes/lt' },
     { icon: 'type', label: '판서 스타일', to: '/settings/board' },
     { icon: 'cpu', label: '제작 엔진', to: '/settings/engine' },
     { icon: 'phone', label: '학생 화면 보기', to: '/settings/preview' },
@@ -298,25 +316,28 @@ export function Cover({ lec, sm }) {
   </div>`;
 }
 
-// 과제 한 줄: 반, 마감, 완료한 학생, 아직 안 본 학생 이름, 알림 문구 복사
+// 과제 한 줄: 반, 마감, 끝낸 학생(강의를 다 보고 숙제까지), 강의, 확인 문제, 숙제를 한 학생 수, 아직 안 끝낸 학생, 알림 문구 복사
 function AsgRow({ a, academy, showClass = true, showTitle = true, onClick, actions }) {
   const d = dueLabel(a.due_at);
-  const pct = a.stats.total ? Math.round((a.stats.done / a.stats.total) * 100) : 0;
-  const left = a.stats.total - a.stats.done;
-  const pend = a.stats.pending;
-  return html`<li class=${`asg ${onClick ? 'click' : ''}`} onClick=${onClick}>
+  const st = a.stats || { total: 0, done: 0, watched: 0, quiz: null, hw: null };
+  const pct = st.total ? Math.round((st.done / st.total) * 100) : 0;
+  const left = st.total - st.done;
+  const pend = st.pending;
+  const kinds = [['강의', st.watched], ['확인 문제', st.quiz], ['숙제', st.hw]].filter(([, n]) => n != null);
+  return html`<li class=${`asg ${onClick ? 'click' : ''} ${a.closed_at ? 'closed' : ''}`} onClick=${onClick}>
     <div class="asg-top">
       ${showClass && html`<span class="cls-tag" style=${a.class_color ? `--c:${a.class_color}` : ''}>${a.class_name}</span>`}
       ${showTitle ? html`<b class="asg-t ellipsis">${a.title}</b>` : null}
       <span class="spacer"></span>
-      ${d ? html`<span class=${`chip ${d.tone}`}>${d.text}</span>` : html`<span class="chip">마감 없음</span>`}
+      ${a.closed_at ? html`<span class="chip">목록에서 지움</span>` : d ? html`<span class=${`chip ${d.tone}`}>${d.text}</span>` : html`<span class="chip">마감 없음</span>`}
       ${actions}
     </div>
-    <div class="asg-prog"><${Bar} value=${pct} /><span class="n num">${a.stats.done}/${a.stats.total}명 완료</span></div>
-    ${a.stats.total > 0 && left > 0 && html`<div class="asg-pend">
-      <span>아직 ${pend && pend.length ? html`<b>${pend.slice(0, 5).map((p) => p.name).join(', ')}</b>${left > 5 ? ` 외 ${left - 5}명` : ''}` : html`<b>${left}명</b>`}</span>
+    <div class="asg-prog"><${Bar} value=${pct} /><span class="n num">${st.done}/${st.total}명 끝냄</span></div>
+    ${st.total > 0 && kinds.length > 1 && html`<div class="asg-kinds">${kinds.map(([t, n]) => html`<span class=${n >= st.total ? 'full' : ''}>${t} <b class="num">${n}/${st.total}</b></span>`)}</div>`}
+    ${st.total > 0 && left > 0 && html`<div class="asg-pend">
+      <span>아직 ${pend && pend.length ? html`<b>${pend.slice(0, 5).map((p) => missText(p, st)).join(', ')}</b>${left > 5 ? ` 외 ${left - 5}명` : ''}` : html`<b>${left}명</b>`}</span>
       ${pend && html`<button class="btn link" onClick=${(e) => { e.stopPropagation(); copyText(reminderText(a, academy)); }}>알림 문구 복사</button>`}</div>`}
-    ${a.stats.total > 0 && left === 0 && html`<div class="asg-all"><${Icon} name="checkCircle" size="sm" />모두 다 봤어요</div>`}
+    ${st.total > 0 && left === 0 && html`<div class="asg-all"><${Icon} name="checkCircle" size="sm" />${st.hw != null ? '모두 강의를 다 보고 숙제까지 냈어요' : '모두 다 봤어요'}</div>`}
   </li>`;
 }
 
@@ -331,12 +352,13 @@ function buildTodos(data, on, academy) {
     const left = a.stats.total - a.stats.done;
     if (!a.due_at || left <= 0 || a.due_at * 1000 < Date.now() || a.due_at * 1000 > soon) continue;
     out.push({
-      text: `${a.class_name} 「${a.title}」 ${dueLabel(a.due_at).text}, 아직 ${left}명이 다 보지 않았어요`,
-      sub: (a.stats.pending || []).slice(0, 8).map((p) => p.name).join(', '),
+      text: `${a.class_name} 「${a.title}」 ${dueLabel(a.due_at).text}, 아직 ${left}명이 끝내지 않았어요`,
+      sub: (a.stats.pending || []).slice(0, 8).map((p) => missText(p, a.stats)).join(', '),
       go: '알림 문구 복사',
       act: () => copyText(reminderText(a, academy)),
     });
   }
+  if (c.lt_new > 0) out.push({ text: `새 레벨테스트 결과가 ${c.lt_new}개 있어요`, sub: '결과를 확인하고 학부모님께 리포트를 보내 주세요', go: '결과 보기', act: () => go('/classes/lt') });
   if (!data.engine.connected) out.push({ text: '학원 PC에 제작 엔진을 설치해 주세요', sub: '설치 파일 하나만 실행하면 돼요', go: '설치하기', act: () => go('/settings/engine') });
   else if (!on && c.working > 0) out.push({ text: `강의 ${c.working}개가 제작 엔진을 기다리고 있어요`, sub: '학원 PC에서 제작 엔진을 켜 주세요', go: '엔진 보기', act: () => go('/settings/engine') });
   if (!c.classes) out.push({ text: '반을 만들고 학생을 넣어 주세요', sub: '학생은 받은 아이디로 휴대폰에서 강의를 봐요', go: '반 만들기', act: () => go(`/classes?new=${Date.now()}`) });
@@ -402,6 +424,46 @@ function Today({ me, info }) {
 }
 
 // ================================================================ 강의 목록
+// 예전 강의(확인 문제, 숙제 기능이 생기기 전에 만든 강의)에 한 번에 만들기. 강의마다 Claude 사용료가 들어서 버튼으로 둬요
+function BackfillBar() {
+  const [d, setD] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const load = () => api('/api/admin/backfill').then(setD).catch(() => {});
+  useEffect(() => {
+    load();
+  }, []);
+  useEffect(() => {
+    if (!d || !d.working) return undefined;
+    const t = setInterval(load, 20000);
+    return () => clearInterval(t);
+  }, [d && d.working]);
+  if (!d) return null;
+  if (d.working > 0) {
+    return html`<div class="notice bf-bar"><${Icon} name="sparkles" /><div><b>예전 강의의 확인 문제와 숙제를 만드는 중이에요</b>
+      <div class="muted" style="font-size:13px">남은 작업 ${d.working}개예요. 학원 PC 제작 엔진이 새 강의와 레벨테스트 채점을 먼저 하고, 쉬는 동안 차례대로 만들어요.</div></div></div>`;
+  }
+  if (!d.lectures) return null;
+  const make = async () => {
+    const parts = [d.quiz ? `확인 문제 ${d.quiz}개` : '', d.bank ? `숙제 문제 ${d.bank}개` : ''].filter(Boolean).join(', ');
+    const body = parts
+      ? `${parts}를 학원 PC 제작 엔진이 차례대로 만들어요. 새 강의와 레벨테스트 채점을 먼저 하고, 강의마다 Claude 사용료가 들어요. 숙제 문제가 다 만들어지면 사이트 숙제도 저절로 생겨요.`
+      : '이미 만들어 둔 문제로 사이트 숙제를 바로 뽑아요.';
+    if (!(await confirmBox({ title: `강의 ${d.lectures}개에 확인 문제와 숙제를 만들까요?`, body, ok: '만들기' }))) return;
+    setBusy(true);
+    try {
+      const r = await api('/api/admin/backfill', { method: 'POST', body: {} });
+      toast(r.quiz || r.bank ? `강의 ${r.lectures}개를 만들기 시작했어요` : `숙제 ${r.hw}개를 뽑았어요`);
+      load();
+    } catch (e) {
+      toastErr(e);
+    }
+    setBusy(false);
+  };
+  return html`<div class="notice amber bf-bar"><${Icon} name="circleHelp" /><div style="flex:1;min-width:0"><b>확인 문제나 숙제가 없는 강의가 ${d.lectures}개 있어요</b>
+      <div class="muted" style="font-size:13px">확인 문제와 숙제는 새로 만든 강의에만 저절로 생겨요. 그 전에 만든 강의는 여기서 한 번에 만들 수 있어요.</div></div>
+    <${Btn} kind="soft" size="sm" icon="sparkles" busy=${busy} onClick=${make}>한 번에 만들기</${Btn}></div>`;
+}
+
 function Lectures({ f0 }) {
   const [filter, setFilter] = useState(f0);
   const [q, setQ] = useState('');
@@ -428,7 +490,27 @@ function Lectures({ f0 }) {
       /* 저장 못 해도 괜찮아요 */
     }
   };
-  const all = data ? data.lectures : [];
+  // 학년으로 나눠 봐요 (고른 학년은 다음에도 그대로)
+  const [grade, setGrade] = useState(() => {
+    try {
+      const v = localStorage.getItem('ivy.lgrade') || '';
+      return LEVEL_NAME[v] || v === 'none' ? v : '';
+    } catch {
+      return '';
+    }
+  });
+  const setG = (g) => {
+    setGrade(g);
+    try {
+      localStorage.setItem('ivy.lgrade', g);
+    } catch {
+      /* 저장 못 해도 괜찮아요 */
+    }
+  };
+  const every = data ? data.lectures : [];
+  const gradeCount = (g) => every.filter((l) => (g === 'none' ? !levelOf(l) : levelOf(l) === g)).length;
+  const grades = [...LEVELS.map(([k, t]) => [k, t]), ['none', '학년 없음']].filter(([k]) => gradeCount(k) > 0 || grade === k);
+  const all = grade ? every.filter((l) => (grade === 'none' ? !levelOf(l) : levelOf(l) === grade)) : every;
   const by = {
     '': all,
     working: all.filter((l) => WORKING.includes(l.status)),
@@ -439,53 +521,84 @@ function Lectures({ f0 }) {
   const tabs = [['', '전체'], ['working', '만드는 중'], ['review', '검수 대기'], ['done', '완성'], ['failed', '실패']].filter(([k]) => !k || k === 'done' || by[k].length || filter === k);
   const list = (by[filter] || all).filter((l) => matches(l.title, q) || matches(l.source, q));
   return html`<div class="page">
-    <div class="ph"><div><h1>강의</h1><div class="sub">만든 강의와 올린 강의가 모두 여기 있어요.</div></div>
+    <div class="ph lec-ph"><div><h1>강의</h1><div class="sub">만든 강의와 올린 강의가 모두 여기 있어요.</div></div>
       <div class="actions">
         <div class="search-in"><${Icon} name="search" size="sm" /><input class="input" value=${q} onInput=${(e) => setQ(e.target.value)} placeholder="제목, 출처로 찾기" aria-label="강의 찾기" /></div>
         <${Seg} value=${view} onChange=${setV} label="보기 방식" options=${[['tiles', html`<${Icon} name="grid" size="sm" />`, '표지로 보기'], ['rows', html`<${Icon} name="listOrdered" size="sm" />`, '목록으로 보기']]} />
+        <a class="btn secondary" href="#/exams" title="확인 문제와 문제 은행에서 골라 시험지를 만들어요"><${Icon} name="clipboardCheck" />시험</a>
         <a class="btn primary" href="#/new"><${Icon} name="plus" />새 강의</a>
       </div></div>
+    ${every.some((l) => l.status === 'done') && html`<${BackfillBar} />`}
+    ${every.length > 0 && html`<div class="pick-row grade-row" role="group" aria-label="학년">
+      <button type="button" class=${`pick ${!grade ? 'on' : ''}`} aria-pressed=${!grade} onClick=${() => setG('')}>모든 학년<small>${every.length}</small></button>
+      ${grades.map(([k, t]) => html`<button type="button" class=${`pick ${grade === k ? 'on' : ''}`} aria-pressed=${grade === k} onClick=${() => setG(k)}>${t}<small>${gradeCount(k)}</small></button>`)}</div>`}
     <div class="tabs" role="tablist">${tabs.map(([k, label]) => html`<button role="tab" aria-selected=${filter === k} class=${filter === k ? 'on' : ''} onClick=${() => setFilter(k)}>${label}<span class="n num">${by[k].length}</span></button>`)}</div>
     ${loading && !data ? html`<div class="tiles">${[1, 2, 3, 4].map(() => html`<div><div class="skel" style="aspect-ratio:16/9;margin-bottom:10px"></div><${Skel} h=${16} w="80%" /><${Skel} h=${12} w="50%" /></div>`)}</div>`
       : list.length ? (view === 'rows'
         ? html`<div class="panel"><ul class="rows lrows">${list.map((l) => html`<li class="click" onClick=${() => go(`/lecture/${l.id}`)}>
             <${Cover} lec=${l} sm />
             <div style="min-width:0"><div class="lt clamp2">${l.title}</div><div class="ls ellipsis">${l.source || (l.tool === 'manual' ? '내가 찍은 강의' : '출처 없음')}</div></div>
-            <div class="lm">${l.status !== 'done' ? html`<${StatusChip} status=${l.status} />`
+            <div class="lm">${levelOf(l) && html`<span class="chip">${LEVEL_NAME[levelOf(l)]}</span>`}${l.status !== 'done' ? html`<${StatusChip} status=${l.status} />`
               : html`${l.duration ? html`<span class="num">${fmtDur(l.duration)}</span>` : null}${l.assigned_classes ? html`<span class="chip ivy">${l.assigned_classes}개 반 과제</span>` : html`<span class="chip">과제 전</span>`}`}
               <span class="hide-m">${ago(l.updated_at)}</span></div></li>`)}</ul></div>`
         : html`<div class="tiles">${list.map((l) => html`<a class="tile" href=${`#/lecture/${l.id}`}>
             <${Cover} lec=${l} />
             <div class="tb"><div class="tt clamp2">${l.title}</div>
               <div class="ts ellipsis">${l.source || (l.tool === 'manual' ? '내가 찍은 강의' : '출처 없음')}</div>
-              <div class="tmeta">${l.status === 'done'
+              <div class="tmeta">${levelOf(l) && html`<span class="chip grade">${LEVEL_NAME[levelOf(l)]}</span>`}${l.status === 'done'
                 ? html`${l.assigned_classes ? html`<span class="chip ivy">${l.assigned_classes}개 반 과제</span>` : html`<span class="chip">과제 전</span>`}<span>${ago(l.done_at || l.updated_at)}</span>`
                 : html`<span class="ellipsis">${l.status === 'review' ? '대본과 판서를 확인해 주세요' : l.status === 'failed' ? '다시 시도할 수 있어요' : l.progress_msg && (!STATUS[l.status] || l.progress_msg !== STATUS[l.status][0]) ? l.progress_msg : `${ago(l.updated_at)} 요청`}</span>`}</div></div></a>`)}</div>`)
-      : html`<div class="panel"><${Empty} icon="library" title=${filter || q ? '찾는 강의가 없어요' : '아직 강의가 없어요'}
+      : html`<div class="panel"><${Empty} icon="library" title=${filter || q ? '찾는 강의가 없어요' : grade ? `${grade === 'none' ? '학년을 정하지 않은' : LEVEL_NAME[grade]} 강의가 아직 없어요` : '아직 강의가 없어요'}
           action=${!filter && !q && html`<a class="btn soft" href="#/new"><${Icon} name="plus" />새 강의 만들기</a>`}>${filter || q ? '다른 말로 찾아보세요. 초성(ㅁㅅ)으로도 찾을 수 있어요.' : '지문을 넣거나 영상을 올리면 여기에 모여요.'}</${Empty}></div>`}
   </div>`;
 }
 
 // ================================================================ 새 강의 (한 화면에서)
-const LEVELS = [['mid3', '중3'], ['high1', '고1'], ['high2', '고2'], ['high3', '고3']];
+const LEVELS = [['mid1', '중1'], ['mid2', '중2'], ['mid3', '중3'], ['high1', '고1'], ['high2', '고2'], ['high3', '고3']];
+const LEVEL_NAME = Object.fromEntries(LEVELS);
+const levelOf = (l) => (l && l.options && LEVEL_NAME[l.options.level] ? l.options.level : '');
+// 새 강의 학년은 마지막에 고른 학년으로 시작해요 (중1 강의를 이어서 만들 때 편하게)
+function lastLevel() {
+  try {
+    const v = localStorage.getItem('ivy.level');
+    return LEVEL_NAME[v] ? v : 'high1';
+  } catch {
+    return 'high1';
+  }
+}
+function keepLevel(v) {
+  try {
+    localStorage.setItem('ivy.level', v);
+  } catch {
+    /* 저장 못 해도 괜찮아요 */
+  }
+}
+// 강의 말투: 반말 강의체, 반존대(존댓말에 반말을 섞어요), 존댓말
+const TONE_OPTS = [['banmal', '반말', '반말 강의체'], ['banjon', '반존대', '존댓말을 바탕으로 반말을 섞어요'], ['jondaet', '존댓말', '존댓말 강의체']];
 const FOCUS = [['balanced', '골고루'], ['grammar', '어법'], ['reading', '독해 흐름'], ['vocab', '어휘']];
 
-// PDF에서 복사하면 줄마다 끊겨요: 문단 안의 줄바꿈을 띄어쓰기로 바꿔요
-function tidyPassage(t) {
-  return String(t || '')
-    .replace(/\r/g, '')
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/-\n(?=[A-Za-z])/g, '-')
-    .replace(/([^\n])\n(?!\n)/g, '$1 ')
-    .replace(/[ \t]{2,}/g, ' ')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+// 붙여 넣은 자료를 정리한 결과 한 줄 (뺀 줄은 마우스를 올리면 보여요)
+function prepSummary(p) {
+  if (!p) return '자료를 정리했어요.';
+  const bits = [];
+  if (p.headings) bits.push(`소제목 ${p.headings}개를 따로 떼고`);
+  if (p.dropped.length) {
+    const why = {};
+    for (const d of p.dropped) why[d.why] = (why[d.why] || 0) + 1;
+    bits.push(`지문이 아닌 줄 ${p.dropped.length}개(${Object.entries(why).map(([k, v]) => `${k} ${v}`).join(', ')})를 빼고`);
+  }
+  bits.push('끊긴 줄을 이었어요');
+  return `붙여 넣은 자료를 정리했어요: ${bits.join(', ')}.`;
 }
 
 function Composer({ mode0 }) {
   const [mode, setMode] = useState(mode0 === 'upload' ? 'upload' : 'passage');
   const [f, setF] = useState({ title: '', source: '', passage: '', translation: '' });
-  const [o, setO] = useState({ minutes: 15, tone: 'banmal', focus: 'balanced', level: 'high1', practice: true, auto_approve: false, call_names: true, memo: '' });
+  const [o, setO] = useState({ minutes: 15, tone: 'banmal', focus: 'balanced', level: lastLevel(), practice: true, auto_approve: false, call_names: true, memo: '' });
+  const setLevel = (v) => {
+    setO((x) => ({ ...x, level: v }));
+    keepLevel(v);
+  };
   const [up, setUp] = useState({ auto_subtitle: true, auto_summary: true });
   const [files, setFiles] = useState({ video: null, note: null, practice: null });
   const [busy, setBusy] = useState(false);
@@ -494,7 +607,30 @@ function Composer({ mode0 }) {
   const [showTr, setShowTr] = useState(false);
   const [showMemo, setShowMemo] = useState(false);
   const [undo, setUndo] = useState(null);
+  const [prep, setPrep] = useState(null); // 붙여 넣은 자료를 정리한 결과 { dropped, headings }
+  const [split, setSplit] = useState(null); // 나눠서 만들기: null 이면 길이에 따라 저절로
   const [drag, setDrag] = useState(false);
+  const [photos, setPhotos] = useState([]); // 지문을 읽을 교과서 사진·PDF (올린 자료)
+  const [reading, setReading] = useState(null); // 사진 읽기 작업 { id, status, progress, progress_msg, error }
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const readDone = useRef(new Set()); // 지문 칸에 넣은 읽기 작업 (두 번 넣지 않게)
+  // 사진 읽기 작업이 끝날 때까지 지켜봐요
+  useEffect(() => {
+    if (!reading || !['queued', 'running'].includes(reading.status)) return;
+    const t = setInterval(async () => {
+      try {
+        const r = await api(`/api/admin/tasks/${reading.id}`);
+        if (readDone.current.has(r.task.id)) return;
+        if (r.task.status === 'done' || r.task.status === 'failed') readDone.current.add(r.task.id);
+        setReading(r.task);
+        if (r.task.status === 'done' && r.task.result) applyRead(r.task.result);
+        if (r.task.status === 'failed') toast(`사진을 읽지 못했어요: ${r.task.error || ''}`, 'err');
+      } catch (e) {
+        if (e && e.status === 404) setReading(null);
+      }
+    }, 2500);
+    return () => clearInterval(t);
+  }, [reading && reading.id, reading && reading.status]);
   useEffect(() => {
     api('/api/admin/settings').then((r) => {
       setEng(r.settings);
@@ -511,11 +647,87 @@ function Composer({ mode0 }) {
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const upload = mode === 'upload';
   const text = f.passage.trim();
-  const words = text ? text.split(/\s+/).length : 0;
-  const sents = (text.match(/[.!?]+["'”’)\]]*(?=\s|$)/g) || []).length;
-  const needsTidy = !undo && /[^\n]\n[^\n]/.test(f.passage) && f.passage.split('\n').length >= 3;
-  const canGo = upload ? !!(f.title.trim() && files.video) : words >= 20;
+  const words = text ? text.replace(/^#+.*$/gm, '').split(/\s+/).filter(Boolean).length : 0;
+  // 지문 구성: 소제목(## 줄)과 문단, 문장 수. 길면 소제목(없으면 문단)마다 나눠 강의 여러 개로 만들어요
+  const ol = upload ? null : outline(f.passage);
+  const sents = ol ? ol.total : 0;
+  const parts = ol && sents >= 20 ? planParts(ol) : [];
+  const mustSplit = sents > 40;
+  const splitOn = parts.length >= 2 && (mustSplit || (split === null ? sents > 30 : split));
+  const tooLong = !upload && !splitOn && (mustSplit || f.passage.length > 12000);
+  const needsTidy = !undo && ((/[^\n]\n[^\n]/.test(f.passage) && f.passage.split('\n').length >= 3) || f.passage.split('\n').some((l) => !/^#/.test(l.trim()) && noiseLine(l)));
+  const canGo = upload ? !!(f.title.trim() && files.video) : words >= 20 && !tooLong;
+  // 붙여 넣는 순간 자료 정리: 끊긴 줄 잇기, 소제목 떼기, 쪽 번호·어휘 풀이 줄 빼기 (되돌리기 가능)
+  const tidyNow = (raw) => {
+    const r = prepareMaterial(raw);
+    setUndo(raw);
+    setF((x) => ({ ...x, passage: r.text }));
+    setPrep({ dropped: r.dropped, headings: r.headings });
+  };
+  const onPaste = (e) => {
+    const clip = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
+    if (!clip || !/\n/.test(clip.trim())) return;
+    const el = e.target;
+    const raw = f.passage.slice(0, el.selectionStart) + clip + f.passage.slice(el.selectionEnd);
+    if (prepareMaterial(raw).text === raw.trim()) return;
+    e.preventDefault();
+    tidyNow(raw);
+  };
   const on = eng && engineOnline(eng.engine_last_seen);
+  // 교과서 사진·PDF 올리기 → 학원 PC 엔진이 지문 글자를 읽어 칸을 채워요
+  const readPhotos = async (list) => {
+    try {
+      const r = await api('/api/admin/materials/read', { method: 'POST', body: { ids: list.map((x) => x.id) } });
+      setReading({ id: r.task_id, status: 'queued', progress: 0 });
+    } catch (e) {
+      toastErr(e);
+    }
+  };
+  const pickPhotos = async (files) => {
+    if (!files || !files.length) return;
+    setPhotoBusy(true);
+    const added = [];
+    for (const file of [...files].slice(0, 12)) {
+      try {
+        added.push(await uploadMaterial(file, { purpose: 'passage' }));
+      } catch (e) {
+        toastErr(e);
+      }
+    }
+    setPhotoBusy(false);
+    if (!added.length) return;
+    const all = [...photos, ...added];
+    setPhotos(all);
+    readPhotos(all);
+  };
+  const dropPhoto = async (x) => {
+    try {
+      await api(`/api/admin/materials/${x.id}`, { method: 'DELETE' });
+    } catch {
+      /* 이미 지워졌으면 그냥 빼요 */
+    }
+    setPhotos(photos.filter((y) => y.id !== x.id));
+  };
+  const applyRead = async (r) => {
+    const cur = document.getElementById('psg');
+    const has = cur && cur.value.trim();
+    if (has && !(await confirmBox({ title: '지문 칸을 사진에서 읽은 글로 바꿀까요?', body: '지금 지문 칸에 있는 글은 지워져요.', ok: '바꾸기' }))) return;
+    setF((x) => ({
+      ...x,
+      passage: r.passage || x.passage,
+      title: x.title.trim() ? x.title : r.title || '',
+      source: x.source.trim() ? x.source : r.source || '',
+      translation: r.translation ? r.translation : x.translation,
+    }));
+    if (r.translation) setShowTr(true);
+    setUndo(null);
+    setPrep(null);
+    toast(r.note ? `사진에서 지문을 읽었어요. ${r.note}` : '사진에서 지문을 읽었어요. 틀린 글자가 없는지 한 번 봐 주세요.');
+  };
+  const attachPhotos = async (lectureId) => {
+    if (!photos.length) return;
+    await api('/api/admin/materials/attach', { method: 'POST', body: { lecture_id: lectureId, ids: photos.map((x) => x.id) } }).catch(() => {});
+  };
   const pickVideo = (file) => {
     if (!file) return;
     if (!/^video\//.test(file.type) && !/\.mp4$/i.test(file.name)) return toast('MP4 영상 파일을 골라 주세요', 'err');
@@ -528,7 +740,7 @@ function Composer({ mode0 }) {
     try {
       if (upload) {
         const dur = await videoDuration(files.video);
-        const r = await api('/api/admin/lectures', { method: 'POST', body: { title: f.title, source: f.source, manual: true, tool: 'manual', options: up } });
+        const r = await api('/api/admin/lectures', { method: 'POST', body: { title: f.title, source: f.source, manual: true, tool: 'manual', options: { ...up, level: o.level } } });
         await uploadFile(files.video, r.id, 'video', (p) => setUpPct(Math.round(p * 0.85)), { duration: dur });
         const thumb = await videoThumb(files.video);
         if (thumb) await uploadFile(thumb, r.id, 'thumb').catch(() => {});
@@ -539,8 +751,31 @@ function Composer({ mode0 }) {
         toast('강의를 올렸어요');
         emit('ivy:changed');
         go(`/lecture/${r.id}`);
+      } else if (splitOn) {
+        // 나눠서 만들기: 부마다 강의를 하나씩 만들어요 (제목·출처 뒤에 몇 부인지 붙여요)
+        const N = parts.length;
+        const trs = splitTranslation(f.translation, parts, sents);
+        for (let i = 0; i < N; i++) {
+          setUpPct(Math.round((i / N) * 100));
+          const made = await api('/api/admin/lectures', {
+            method: 'POST',
+            body: {
+              title: f.title.trim() ? `${f.title.trim()} ${i + 1}부` : '',
+              source: f.source.trim() ? `${f.source.trim()} (${i + 1}/${N})` : `${i + 1}/${N}부`,
+              passage: parts[i].text,
+              translation: trs ? trs[i] : f.translation,
+              tool: 'passage',
+              options: o,
+            },
+          });
+          if (i === 0) await attachPhotos(made.id);
+        }
+        toast(`강의 ${N}개를 만들도록 요청했어요`);
+        emit('ivy:changed');
+        go('/lectures');
       } else {
         const r = await api('/api/admin/lectures', { method: 'POST', body: { ...f, title: f.title.trim(), tool: 'passage', options: o } });
+        await attachPhotos(r.id);
         toast('제작을 요청했어요');
         emit('ivy:changed');
         go(`/lecture/${r.id}`);
@@ -570,13 +805,29 @@ function Composer({ mode0 }) {
           <${Field} label="출처" hint="판서 머리글과 강의 목록에 보여요"><input value=${f.source} onInput=${set('source')} placeholder="예: 올림포스 영어독해 기본 1, 18번" /></${Field}>
         </div>
         <div class="stack sm">
-          <label class="label" for="psg">영어 지문</label>
-          <div class="passage-box"><textarea id="psg" class="input" value=${f.passage} onInput=${(e) => { setF({ ...f, passage: e.target.value }); setUndo(null); }} spellcheck="false"
-            placeholder="지문을 그대로 붙여 넣어 주세요. 문제 번호와 선택지는 빼도 돼요."></textarea></div>
-          <div class="meta-line"><span class="num">${words}단어</span>${sents > 0 && html`<span class="num">문장 ${sents}개</span>`}
+          <div class="row between" style="gap:10px"><label class="label" for="psg">영어 지문</label>
+            <label class=${`btn secondary sm ${photoBusy ? 'busy' : ''}`} style="cursor:pointer"><${Icon} name="image" size="sm" />${photoBusy ? '올리는 중…' : '사진, PDF로 넣기'}
+              <input type="file" multiple accept="image/*,application/pdf" class="sr" disabled=${photoBusy} onChange=${(e) => { pickPhotos(e.target.files); e.target.value = ''; }} /></label></div>
+          ${photos.length > 0 && html`<div class="photo-box">
+            <div class="photo-list">${photos.map((x) => html`<span class="photo-chip"><${Icon} name=${x.mime === 'application/pdf' ? 'fileText' : 'image'} size="sm" /><span class="ellipsis">${x.name}</span>
+              <button class="btn ghost icon sm" aria-label="빼기" onClick=${() => dropPhoto(x)}><${Icon} name="x" size="sm" /></button></span>`)}</div>
+            ${reading && ['queued', 'running'].includes(reading.status) && html`<div class="task-run"><div class="row between" style="font-size:13.5px"><b>${reading.status === 'queued' ? (on ? '엔진이 사진을 읽을 차례를 기다리는 중' : '제작 엔진이 꺼져 있어요. 학원 PC에서 켜면 사진을 읽어요') : reading.progress_msg || '사진에서 지문을 읽는 중'}</b><span class="num muted">${reading.progress || 0}%</span></div><div class="hl-track"><i style=${`width:${reading.progress || 0}%`}></i></div></div>`}
+            ${reading && reading.status === 'done' && html`<div class="faint" style="font-size:13px">사진에서 읽은 지문을 아래 칸에 넣었어요. 틀린 글자가 없는지 확인해 주세요. 사진은 강의를 만들면 강의 화면의 문제 자료 칸에 남고, 언제든 지울 수 있어요.</div>`}
+            ${reading && reading.status === 'failed' && html`<div class="row wrap" style="gap:8px"><span class="warn" style="font-size:13px">사진을 읽지 못했어요: ${reading.error || ''}</span><button class="btn link" onClick=${() => readPhotos(photos)}>다시 읽기</button></div>`}
+          </div>`}
+          <div class="passage-box"><textarea id="psg" class="input" value=${f.passage} onPaste=${onPaste} onInput=${(e) => { setF({ ...f, passage: e.target.value }); setUndo(null); setPrep(null); }} spellcheck="false"
+            placeholder="지문이나 교과서 본문을 그대로 붙여 넣어 주세요. 소제목은 따로 떼고, 쪽 번호·어휘 풀이 같은 줄은 저절로 빼요."></textarea></div>
+          <div class="meta-line"><span class="num">${words}단어</span>${sents > 0 && html`<span class="num">문장 ${sents}개</span>`}${ol && ol.headings > 0 && html`<span class="num">소제목 ${ol.headings}개</span>`}
             ${words > 0 && words < 20 && html`<span class="warn">20단어 이상 넣어 주세요</span>`}
-            ${needsTidy && html`<button class="btn link" onClick=${() => { setUndo(f.passage); setF({ ...f, passage: tidyPassage(f.passage) }); }}>줄바꿈 정리하기</button>`}
-            ${undo !== null && html`<span>줄바꿈을 정리했어요.</span><button class="btn link" onClick=${() => { setF({ ...f, passage: undo }); setUndo(null); }}>되돌리기</button>`}</div>
+            ${needsTidy && html`<button class="btn link" onClick=${() => tidyNow(f.passage)}>자료 정리하기</button>`}
+            ${undo !== null && html`<span title=${prep && prep.dropped.length ? `뺀 줄:\n${prep.dropped.map((d) => `· ${d.text} (${d.why})`).join('\n')}` : ''}>${prepSummary(prep)}</span><button class="btn link" onClick=${() => { setF({ ...f, passage: undo }); setUndo(null); setPrep(null); }}>되돌리기</button>`}</div>
+          ${ol && ol.headings > 0 && html`<div class="meta-line">'## '로 시작하는 줄은 소제목이에요. 판서에서 그 문단 위에 따로 써요. 소제목이 아니면 ## 를 지우고, 빠진 소제목은 줄 앞에 ## 를 붙여 주세요.</div>`}
+          ${parts.length >= 2 && html`<div class="split-box">
+            <${Switch} checked=${splitOn} onChange=${(v) => setSplit(mustSplit ? true : v)} title=${`나눠서 강의 ${parts.length}개 만들기`}
+              desc=${mustSplit ? '문장이 40개를 넘어서 한 강의로는 만들 수 없어요. 나눠서 만들어요.' : `문장이 ${sents}개예요. ${ol.headings ? '소제목' : '문단'}마다 나누면 문장 하나하나를 더 자세히 설명해요.`} />
+            ${splitOn && html`<ol class="part-list">${parts.map((p, i) => html`<li><b>${i + 1}부</b><span class="pt">${p.headings.length ? p.headings.join(' · ') : `${p.first.slice(0, 60)}${p.first.length > 60 ? '…' : ''}`}</span><span class="num">문장 ${p.n}개</span></li>`)}</ol>`}
+          </div>`}
+          ${tooLong && html`<div class="notice amber"><${Icon} name="alert" /><div>${mustSplit ? `문장이 ${sents}개라 한 강의로는 만들 수 없어요. 빈 줄로 문단을 나누거나 줄 앞에 ## 를 붙여 소제목을 표시하면 나눠서 만들 수 있어요.` : '지문이 너무 길어요 (12,000자까지). 나눠서 만들기를 켜 주세요.'}</div></div>`}
         </div>
         <div class="stack sm">
           <button class=${`more-t ${showTr ? 'open' : ''}`} aria-expanded=${showTr} onClick=${() => setShowTr(!showTr)}><${Icon} name="chevronDown" size="sm" />해석도 넣기<span class="faint" style="font-weight:550">(선택, 넣으면 이 해석을 기준으로 설명해요)</span></button>
@@ -589,18 +840,19 @@ function Composer({ mode0 }) {
       </div>
       <aside class="panel pad opts">
         <div class="opt-g"><div class="label">강의 길이</div><${Seg} full value=${o.minutes} onChange=${(v) => setO({ ...o, minutes: v })} options=${[[10, '10분'], [15, '15분'], [20, '20분']]} /></div>
-        <div class="opt-g"><div class="label">말투</div><${Seg} full value=${o.tone} onChange=${(v) => setO({ ...o, tone: v })} options=${[['banmal', '반말 강의체'], ['jondaet', '존댓말']]} /></div>
-        <div class="opt-g"><div class="label">학년</div><${Seg} full value=${o.level} onChange=${(v) => setO({ ...o, level: v })} options=${LEVELS} /></div>
+        <div class="opt-g"><div class="label">말투</div><${Seg} full value=${o.tone} onChange=${(v) => setO({ ...o, tone: v })} options=${TONE_OPTS} /></div>
+        <div class="opt-g"><div class="label">학년</div><${Seg} full value=${o.level} onChange=${setLevel} options=${LEVELS} /></div>
         <div class="opt-g"><div class="label">설명 중점</div><${Seg} full value=${o.focus} onChange=${(v) => setO({ ...o, focus: v })} options=${FOCUS} /></div>
         <div style="margin-top:8px">
           <${Switch} checked=${o.call_names} onChange=${(v) => setO({ ...o, call_names: v })} title="학생 이름 불러 주기" desc="강의 중 3~4번, 보는 학생 이름을 불러요" />
           <${Switch} checked=${o.practice} onChange=${(v) => setO({ ...o, practice: v })} title="연습지 만들기" desc="어법, 어휘, 해석 연습지 PDF" />
           <${Switch} checked=${!o.auto_approve} onChange=${(v) => setO({ ...o, auto_approve: !v })} title="영상 전에 검수하기" desc="대본과 판서를 먼저 보고 고쳐요 (추천)" />
+          <${Switch} checked=${o.review !== false} onChange=${(v) => setO({ ...o, review: v })} title="AI 자료 검토" desc="문제·지시문처럼 지문이 아닌 문장은 빼고, 붙은 소제목은 떼요" />
         </div>
         <div class="go-box">
           ${eng && !on && html`<div class="notice amber" style="font-size:13px;padding:10px 12px"><${Icon} name="alert" size="sm" /><div>제작 엔진이 꺼져 있어요. 요청은 저장되고, 학원 PC에서 켜면 그때 만들어요.</div></div>`}
-          <${Btn} kind="primary" size="lg" block icon="wand" busy=${busy} disabled=${!canGo} onClick=${submit}>강의 만들기</${Btn}>
-          <div class="hint">${MOD_KEY}+Enter로도 만들어요. 대본과 판서는 2~3분, 영상은 10분 안팎 걸려요.</div>
+          <${Btn} kind="primary" size="lg" block icon="wand" busy=${busy} disabled=${!canGo} onClick=${submit}>${splitOn ? `강의 ${parts.length}개 만들기` : '강의 만들기'}</${Btn}>
+          <div class="hint">${MOD_KEY}+Enter로도 만들어요. ${splitOn ? '강의마다 차례로 만들어요. 하나에 ' : ''}대본과 판서는 2~3분, 영상은 10분 안팎 걸려요.</div>
         </div>
       </aside>
     </div>`
@@ -621,6 +873,7 @@ function Composer({ mode0 }) {
         <div class="grid2">${pdfRow('note', '판서노트')}${pdfRow('practice', '연습지')}</div>
       </div>
       <aside class="panel pad opts">
+        <div class="opt-g"><div class="label">학년</div><${Seg} full value=${o.level} onChange=${setLevel} options=${LEVELS} /></div>
         <h3 style="margin:0 0 6px;font-size:16px;font-weight:750">올린 다음에</h3>
         <${Switch} checked=${up.auto_subtitle} onChange=${(v) => setUp({ ...up, auto_subtitle: v, auto_summary: v && up.auto_summary })} title="자동 자막" desc="학원 PC가 영상의 말을 받아 적어요" />
         <${Switch} checked=${up.auto_summary} onChange=${(v) => setUp({ ...up, auto_summary: v, auto_subtitle: v || up.auto_subtitle })} title="AI 요약과 복습 노트" desc="자막으로 요약, 목차, 확인 문제를 만들어요" />
@@ -635,18 +888,6 @@ function Composer({ mode0 }) {
 }
 
 // ================================================================ 과제 내기 창
-function DuePicker({ due, setDue, noDue, setNoDue }) {
-  const quick = [[1, '내일'], [3, '3일 뒤'], [7, '1주 뒤'], [14, '2주 뒤']];
-  return html`<div class="field"><label>마감</label>
-    <div class="pick-row">${quick.map(([n, label]) => {
-      const v = daysLater(n);
-      return html`<button type="button" class=${`pick ${!noDue && due === v ? 'on' : ''}`} onClick=${() => { setNoDue(false); setDue(v); }}>${label}</button>`;
-    })}<button type="button" class=${`pick ${noDue ? 'on' : ''}`} onClick=${() => setNoDue(true)}>마감 없음</button></div>
-    ${!noDue && html`<div class="row wrap" style="margin-top:6px;gap:10px"><input type="date" class="input" value=${due} onInput=${(e) => setDue(e.target.value)} style="max-width:190px" aria-label="마감일" />
-      ${due && html`<span class="muted" style="font-size:13.5px">${fmtDate(endOfDay(due))} 밤 11시 59분까지</span>`}</div>`}
-  </div>`;
-}
-
 export function AssignModal({ lectureId, classId, onClose, onDone }) {
   const [classes, setClasses] = useState(null);
   const [lectures, setLectures] = useState(null);
@@ -678,7 +919,14 @@ export function AssignModal({ lectureId, classId, onClose, onDone }) {
   return html`<${Modal} title="과제 내기" onClose=${onClose} footer=${html`<${Btn} onClick=${onClose}>취소</${Btn}><${Btn} kind="primary" icon="send" busy=${busy} disabled=${!lec || !pick.length} onClick=${save}>${pick.length > 1 ? `${pick.length}개 반에 내기` : '과제 내기'}</${Btn}>`}>
     <div class="stack">
       ${!lectureId && html`<${Field} label="강의"><select value=${lec} onChange=${(e) => setLec(e.target.value)}><option value="">${lectures === null ? '불러오는 중…' : lectures.length ? '강의를 골라 주세요' : '완성된 강의가 없어요'}</option>
-        ${(lectures || []).map((l) => html`<option value=${l.id}>${l.title}${l.source ? ` (${l.source})` : ''}</option>`)}</select></${Field}>`}
+        ${(() => {
+          const opt = (l) => html`<option value=${l.id}>${l.title}${l.source ? ` (${l.source})` : ''}</option>`;
+          const ls = lectures || [];
+          const groups = LEVELS.map(([k, t]) => [t, ls.filter((l) => levelOf(l) === k)]).filter(([, g]) => g.length);
+          const rest = ls.filter((l) => !levelOf(l));
+          if (groups.length <= 1 && !rest.length) return ls.map(opt);
+          return [...groups.map(([t, g]) => html`<optgroup label=${t}>${g.map(opt)}</optgroup>`), rest.length ? html`<optgroup label="학년 없음">${rest.map(opt)}</optgroup>` : null];
+        })()}</select></${Field}>`}
       <div class="field"><label>반 (여러 개 고를 수 있어요)</label>
         ${classes === null ? html`<${Skel} h=${38} />` : classes.length ? html`<div class="pick-row">${classes.map(
           (c) => html`<button type="button" class=${`pick ${pick.includes(c.id) ? 'on' : ''}`} aria-pressed=${pick.includes(c.id)} onClick=${() => toggle(c.id)}><span class="cls-dot" style=${c.color ? `background:${c.color}` : ''}></span>${c.name}<small>${c.students}명</small></button>`,
@@ -712,9 +960,13 @@ function DueModal({ a, onClose, onDone }) {
 }
 
 // ================================================================ 강의 하나
+const TASK_NAME = { transcribe: '자막', summarize: 'AI 요약', quiz: '확인 문제' };
+
 function EditCard({ lec, tasks }) {
-  const run = tasks.find((x) => x.status === 'queued' || x.status === 'running');
-  const failed = tasks.find((x) => x.status === 'failed');
+  // 확인 문제 작업은 확인 문제 칸에서 따로 보여 줘요
+  const mine = tasks.filter((x) => x.kind !== 'quiz');
+  const run = mine.find((x) => x.status === 'queued' || x.status === 'running');
+  const failed = mine.find((x) => x.status === 'failed');
   const e = lec.edit || {};
   const items = [
     ['captions', '자막', lec.has_subtitle ? '있어요' : lec.tool !== 'manual' ? '영상에 있어요' : '없어요', lec.has_subtitle || lec.tool !== 'manual'],
@@ -727,8 +979,8 @@ function EditCard({ lec, tasks }) {
   return html`<section class="panel"><div class="panel-h"><h2>편집과 학습 도구</h2><span class="spacer"></span><${Btn} size="sm" icon="scissors" onClick=${() => go(`/edit/${lec.id}`)}>편집하기</${Btn}></div>
     <div class="panel-b stack">
       <div class="tool-grid">${items.map(([ic, k, v, on]) => html`<div class=${`tool-i ${on ? 'on' : ''}`}><${Icon} name=${ic} size="sm" /><span>${k}</span><b>${v}</b></div>`)}</div>
-      ${run && html`<div class="task-run"><div class="row between" style="font-size:13.5px"><b>${run.kind === 'transcribe' ? '자막' : 'AI 요약'}: ${run.status === 'queued' ? '차례를 기다리는 중' : run.progress_msg || '만드는 중'}</b><span class="num muted">${run.progress || 0}%</span></div><div class="hl-track"><i style=${`width:${run.progress || 0}%`}></i></div></div>`}
-      ${!run && failed && html`<div class="notice rose"><${Icon} name="alert" /><div style="font-size:13.5px">${failed.kind === 'transcribe' ? '자막' : 'AI 요약'}을 만들지 못했어요: ${failed.error || ''}</div></div>`}
+      ${run && html`<div class="task-run"><div class="row between" style="font-size:13.5px"><b>${TASK_NAME[run.kind] || run.kind}: ${run.status === 'queued' ? '차례를 기다리는 중' : run.progress_msg || '만드는 중'}</b><span class="num muted">${run.progress || 0}%</span></div><div class="hl-track"><i style=${`width:${run.progress || 0}%`}></i></div></div>`}
+      ${!run && failed && html`<div class="notice rose"><${Icon} name="alert" /><div style="font-size:13.5px">${TASK_NAME[failed.kind] || failed.kind}을 만들지 못했어요: ${failed.error || ''}</div></div>`}
     </div></section>`;
 }
 
@@ -803,13 +1055,13 @@ function LectureDetail({ id, info }) {
   const f = data.files || {};
   const done = lec.status === 'done';
   const academy = info.academy_name;
-  const meta = [lec.source || '출처 없음', `${fmtDate(lec.created_at)}에 만듦`, lec.voice_label ? `목소리 ${lec.voice_label}` : ''].filter(Boolean).join(', ');
+  const meta = [LEVEL_NAME[levelOf(lec)], lec.source || '출처 없음', `${fmtDate(lec.created_at)}에 만듦`].filter(Boolean).join(', ');
   return html`<div class="page">
     <button class="crumb" onClick=${() => go('/lectures')}><${Icon} name="chevronLeft" size="sm" />강의</button>
     <div class="lec-head">
       <div style="min-width:0;flex:1"><div class="row wrap" style="gap:10px"><h1>${lec.title}</h1><${StatusChip} status=${lec.status} /></div><div class="sub">${meta}</div></div>
       <div class="actions">
-        <${Btn} size="sm" icon="pencil" onClick=${() => setEdit(true)}>이름 바꾸기</${Btn}>
+        <${Btn} size="sm" icon="pencil" onClick=${() => setEdit(true)}>이름, 학년 바꾸기</${Btn}>
         ${done && lec.has_video && html`<${Btn} size="sm" icon="scissors" onClick=${() => go(`/edit/${lec.id}`)}>편집</${Btn}>`}
         ${done && html`<${Btn} kind="primary" size="sm" icon="send" onClick=${() => openAssign({ lectureId: lec.id })}>과제 내기</${Btn}>`}
       </div>
@@ -850,12 +1102,18 @@ function LectureDetail({ id, info }) {
             <span class="meta num">${fmtDur(lec.duration)}${lec.video_bytes ? `, ${fmtBytes(lec.video_bytes)}` : ''}</span>
           </div></section>`}
         ${done && lec.has_video && html`<${EditCard} lec=${lec} tasks=${data.tasks || []} />`}
+        ${done && html`<${QuizCard} lec=${lec} />`}
+        ${done && html`<${HomeworkCard} lec=${lec} />`}
+        ${done && html`<${MockCard} lec=${lec} />`}
       </div>
       <div class="stack lg">
         ${done && html`<section class="panel"><div class="panel-h"><h2>과제</h2>${data.assignments.length > 0 && html`<span class="count">${data.assignments.length}개 반</span>`}<span class="spacer"></span>
             <${Btn} kind="ghost" size="sm" icon="plus" onClick=${() => openAssign({ lectureId: lec.id })}>반 더하기</${Btn}></div>
-          ${data.assignments.length ? html`<ul class="rows">${data.assignments.map((a) => html`<${AsgRow} a=${{ ...a, title: lec.title }} academy=${academy} showTitle=${false} onClick=${() => go(`/classes/${a.class_id}`)} />`)}</ul>`
+          ${data.assignments.length ? html`<ul class="rows">${data.assignments.map((a) => html`<${AsgRow} a=${{ ...a, title: lec.title }} academy=${academy} showTitle=${false} onClick=${() => go(`/classes/${a.class_id}`)}
+              actions=${a.closed_at ? html`<button class="btn ghost sm" onClick=${async (e) => { e.stopPropagation(); try { await api('/api/admin/assignments/close', { method: 'POST', body: { ids: [a.id], closed: false } }); toast('다시 목록에 보여요'); reload(true); } catch (err) { toastErr(err); } }}><${Icon} name="undo" size="sm" />다시 보이기</button>` : null} />`)}</ul>`
             : html`<${Empty} icon="send" title="아직 과제로 내지 않았어요" action=${html`<${Btn} kind="soft" icon="send" onClick=${() => openAssign({ lectureId: lec.id })}>과제 내기</${Btn}>`}>반을 고르면 학생 앱에 바로 나타나요.</${Empty}>`}</section>`}
+        ${done && html`<${MaterialsCard} lec=${lec} />`}
+        ${lec.script && lec.script.material && html`<${MaterialNote} m=${lec.script.material} />`}
         ${lec.passage && html`<section class="panel"><div class="panel-h"><h2>지문</h2><span class="spacer"></span><${Btn} kind="ghost" size="sm" onClick=${() => setShowPassage(!showPassage)}>${showPassage ? '접기' : '모두 보기'}</${Btn}></div>
           <div class="panel-b"><p class=${`passage-text ${showPassage ? '' : 'clip'}`}>${lec.passage}</p></div></section>`}
         <section class="panel"><div class="panel-h"><h2>관리</h2></div><div class="panel-b" style="padding-top:2px"><div class="mng">
@@ -872,14 +1130,133 @@ function LectureDetail({ id, info }) {
   </div>`;
 }
 
+// ------------------------------------------------------------ 확인 문제 (강의를 듣고 푸는 문제와 학생 점수)
+function QuizCard({ lec }) {
+  const { data, reload } = useAsync(() => api(`/api/admin/lectures/${lec.id}/quiz`), [lec.id]);
+  const [showKey, setShowKey] = useState(false);
+  const [stu, setStu] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const task = data && data.task;
+  const making = !!(task && ['queued', 'running'].includes(task.status));
+  useEffect(() => {
+    if (!making) return;
+    const t = setInterval(() => reload(true), 4000);
+    return () => clearInterval(t);
+  }, [making]);
+  const canMake = lec.has_script || lec.has_transcript;
+  const make = async (again) => {
+    if (again && !(await confirmBox({ title: '확인 문제를 새로 만들까요?', body: '새 문제로 바뀌면 학생들은 새 문제를 다시 풀어요. 지금까지 푼 점수는 시청표에서 빠져요.', ok: '새로 만들기' }))) return;
+    setBusy(true);
+    try {
+      await api(`/api/admin/lectures/${lec.id}/tasks`, { method: 'POST', body: { kind: 'quiz' } });
+      toast('확인 문제를 만들기 시작했어요');
+      reload(true);
+    } catch (e) {
+      toastErr(e);
+    }
+    setBusy(false);
+  };
+  const quiz = data && data.quiz;
+  const atts = (data && data.attempts) || [];
+  const pend = (data && data.pending) || [];
+  const n = quiz ? quiz.items.length : 0;
+  const avg = atts.length ? atts.reduce((t, a) => t + a.score, 0) / atts.length : 0;
+  const hard = quiz && atts.length >= 3
+    ? quiz.items.map((it, i) => ({ it, i, rate: data.right[i] / atts.length })).filter((x) => x.rate < 0.6).sort((a, b) => a.rate - b.rate).slice(0, 3)
+    : [];
+  const head = html`<div class="panel-h"><h2>확인 문제</h2>${quiz && html`<span class="count">${n}문항</span>`}<span class="spacer"></span>
+    ${quiz && html`<${Btn} size="sm" icon="printer" onClick=${() => window.open(`/print.html#q${lec.id}`, '_blank')}>인쇄</${Btn}><${Btn} size="sm" icon="eye" onClick=${() => setShowKey(true)}>문제 보기</${Btn}>`}</div>`;
+  if (!data) return html`<section class="panel">${head}<div class="panel-b"><${Skel} h=${60} /></div></section>`;
+  return html`<section class="panel">${head}
+    <div class="panel-b stack">
+      ${making && html`<div class="task-run"><div class="row between" style="font-size:13.5px"><b>${task.status === 'queued' ? '확인 문제: 차례를 기다리는 중' : task.progress_msg || '확인 문제를 만드는 중'}</b><span class="num muted">${task.progress || 0}%</span></div>
+        <div class="hl-track"><i style=${`width:${task.progress || 0}%`}></i></div>
+        ${task.status === 'queued' && html`<div class="faint" style="font-size:12.5px;margin-top:6px">학원 PC의 제작 엔진이 1.1.8 이상이어야 만들어요. 엔진은 저절로 업데이트돼요.</div>`}</div>`}
+      ${!quiz && !making && task && task.status === 'failed' && html`<div class="notice rose"><${Icon} name="alert" /><div style="font-size:13.5px">확인 문제를 만들지 못했어요: ${task.error || ''}</div></div>`}
+      ${!quiz && !making && html`<div class="row wrap" style="gap:12px"><p class="muted" style="margin:0;flex:1;min-width:220px;font-size:14px">${canMake ? '강의를 듣고 푸는 객관식 25문항을 AI가 만들어요. 어휘(동의어, 반의어), 문법, 해석, 내용, 변형 유형을 내신처럼 묻고, 만든 뒤 한 번 더 검사해서 억지 문제는 빼요. 학생은 폰이나 PC에서 풀면 바로 채점돼요.' : '확인 문제는 강의 대본이나 자막으로 만들어요. 자막을 먼저 만들어 주세요.'}</p>
+        <${Btn} kind="soft" icon="sparkles" busy=${busy} disabled=${!canMake} onClick=${() => make(false)}>${task && task.status === 'failed' ? '다시 시도' : '확인 문제 만들기'}</${Btn}></div>`}
+      ${quiz && html`<div class="qk-stats">
+          <div><span>푼 학생</span><b class="num">${atts.length}명</b></div>
+          <div><span>평균</span><b class="num">${atts.length ? `${avg.toFixed(1)}점` : '-'}</b></div>
+          <div><span>아직 안 푼 학생</span><b class="num">${pend.length}명</b></div></div>
+        ${hard.length > 0 && html`<div class="qk-hard"><div class="label">많이 틀린 문제</div>${hard.map(({ it, i, rate }) => html`<button class="qk-h" onClick=${() => setShowKey(true)}>
+          <b class="num">${i + 1}번</b><span class="ellipsis">${AREA[it.area]}, ${it.q}</span><span class="num rate">${Math.round(rate * 100)}%</span></button>`)}</div>`}
+        ${atts.length > 0 ? html`<ul class="rows qk-rows">${atts.map((a) => html`<li class="row" style="cursor:pointer" onClick=${() => setStu(a)}>
+            <div style="flex:1;min-width:0"><b>${a.name}</b> <span class="faint" style="font-size:12.5px">${a.class_name || ''}</span></div>
+            <span class="faint num" style="font-size:12.5px">${fmtDate(a.created_at)}</span><b class="num qk-sc">${a.score}/${a.total}</b></li>`)}</ul>`
+          : html`<p class="muted" style="margin:0;font-size:14px">아직 푼 학생이 없어요. 과제로 낸 반 학생들은 강의 화면에서 바로 풀 수 있어요.</p>`}
+        ${pend.length > 0 && html`<p class="faint" style="margin:0;font-size:13px">안 푼 학생: ${pend.slice(0, 30).map((x) => x.name).join(', ')}${pend.length > 30 ? ` 외 ${pend.length - 30}명` : ''}</p>`}
+        <div class="row wrap" style="justify-content:flex-end;gap:6px"><a class="btn ghost sm" href=${`#/exams/new?l=${lec.id}`}><${Icon} name="clipboardCheck" size="sm" />골라서 시험 만들기</a>
+          <${Btn} kind="ghost" size="sm" icon="refresh" busy=${busy} disabled=${making || !canMake} onClick=${() => make(true)}>새로 만들기</${Btn}></div>`}
+    </div>
+    ${showKey && quiz && html`<${QuizKeyModal} lec=${lec} data=${data} onClose=${() => setShowKey(false)} onDeleted=${() => { setShowKey(false); reload(true); }} />`}
+    ${stu && quiz && html`<${QuizAnswerModal} quiz=${quiz} a=${stu} onClose=${() => setStu(null)} onChanged=${() => reload(true)} />`}
+  </section>`;
+}
+
+function QuizKeyModal({ lec, data, onClose, onDeleted }) {
+  const quiz = data.quiz;
+  const n = data.attempts.length;
+  const del = async () => {
+    if (!(await confirmBox({ title: '확인 문제를 지울까요?', body: '학생 화면에서 확인 문제가 사라져요. 필요하면 나중에 새로 만들 수 있어요.', ok: '지우기', danger: true }))) return;
+    try {
+      await api(`/api/admin/lectures/${lec.id}/quiz`, { method: 'DELETE' });
+      toast('확인 문제를 지웠어요');
+      onDeleted();
+    } catch (e) {
+      toastErr(e);
+    }
+  };
+  return html`<${Modal} title=${`확인 문제, ${quiz.items.length}문항`} onClose=${onClose} wide
+    footer=${html`<button class="btn danger" onClick=${del}><${Icon} name="trash" size="sm" />확인 문제 지우기</button><span class="spacer"></span><button class="btn primary" onClick=${onClose}>닫기</button>`}>
+    <div class="qk-list">${quiz.items.map((it, i) => html`<${QuizItem} it=${it} i=${i} mode="key" stat=${n ? { rate: data.right[i] / n } : null} />`)}</div>
+  </${Modal}>`;
+}
+
+function QuizAnswerModal({ quiz, a, onClose, onChanged }) {
+  const [res, setRes] = useState(a.results);
+  const [score, setScore] = useState(a.score);
+  const setOk = async (i, ok) => {
+    try {
+      const r = await api(`/api/admin/quiz-attempts/${a.id}`, { method: 'PUT', body: { i, ok } });
+      setRes(r.results);
+      setScore(r.score);
+      onChanged();
+    } catch (e) {
+      toastErr(e);
+    }
+  };
+  const reset = async () => {
+    if (!(await confirmBox({ title: `${a.name} 학생이 다시 풀게 할까요?`, body: '지금 점수와 답안이 지워지고, 학생이 처음부터 다시 풀어요.', ok: '다시 풀게 하기', danger: true }))) return;
+    try {
+      await api(`/api/admin/quiz-attempts/${a.id}`, { method: 'DELETE' });
+      toast('다시 풀 수 있게 했어요');
+      onChanged();
+      onClose();
+    } catch (e) {
+      toastErr(e);
+    }
+  };
+  return html`<${Modal} title=${`${a.name}, ${score}/${a.total}점`} onClose=${onClose} wide
+    footer=${html`<button class="btn danger" onClick=${reset}><${Icon} name="refresh" size="sm" />다시 풀게 하기</button><span class="spacer"></span><button class="btn primary" onClick=${onClose}>닫기</button>`}>
+    <p class="muted" style="margin:0 0 10px;font-size:13.5px">${a.class_name || ''} ${fmtDate(a.created_at, true)}에 냈어요. 서술형은 답이 맞는데 틀리게 채점됐으면 '맞음'으로 바꿔 주세요.</p>
+    <div class="qk-list">${quiz.items.map((it, i) => html`<div class="qk-ans">
+      <${QuizItem} it=${it} i=${i} mode="review" value=${a.answers[i]} result=${res[i]} />
+      ${it.type === 'sa' && html`<div class="row" style="gap:6px;justify-content:flex-end;margin:-4px 0 12px">
+        ${isOk(res[i]) ? html`<${Btn} size="sm" kind="ghost" onClick=${() => setOk(i, false)}>틀림으로 바꾸기</${Btn}>` : html`<${Btn} size="sm" kind="soft" onClick=${() => setOk(i, true)}>맞음으로 바꾸기</${Btn}>`}
+        ${res[i] >= 2 && html`<${Btn} size="sm" kind="ghost" onClick=${() => setOk(i, null)}>자동 채점으로</${Btn}>`}</div>`}</div>`)}</div>
+  </${Modal}>`;
+}
+
 function RenameModal({ lec, onClose, onDone }) {
   const [title, setTitle] = useState(lec.title);
   const [source, setSource] = useState(lec.source || '');
+  const [level, setLevel] = useState(levelOf(lec) || '');
   const [busy, setBusy] = useState(false);
   const save = async () => {
     setBusy(true);
     try {
-      await api(`/api/admin/lectures/${lec.id}`, { method: 'PUT', body: { title, source } });
+      await api(`/api/admin/lectures/${lec.id}`, { method: 'PUT', body: { title, source, ...(level ? { level } : {}) } });
       onDone();
       onClose();
     } catch (e) {
@@ -887,12 +1264,31 @@ function RenameModal({ lec, onClose, onDone }) {
     }
     setBusy(false);
   };
-  return html`<${Modal} title="이름 바꾸기" onClose=${onClose} footer=${html`<${Btn} onClick=${onClose}>취소</${Btn}><${Btn} kind="primary" busy=${busy} onClick=${save}>저장</${Btn}>`}>
+  return html`<${Modal} title="이름과 학년 바꾸기" onClose=${onClose} footer=${html`<${Btn} onClick=${onClose}>취소</${Btn}><${Btn} kind="primary" busy=${busy} onClick=${save}>저장</${Btn}>`}>
     <div class="stack"><${Field} label="강의 제목"><input value=${title} onInput=${(e) => setTitle(e.target.value)} /></${Field}>
-      <${Field} label="출처"><input value=${source} onInput=${(e) => setSource(e.target.value)} /></${Field}></div></${Modal}>`;
+      <${Field} label="출처"><input value=${source} onInput=${(e) => setSource(e.target.value)} /></${Field}>
+      <div class="field"><label>학년</label><${Seg} full value=${level} onChange=${setLevel} options=${LEVELS} label="학년" />
+        <div class="hint">강의 목록에서 학년별로 나눠 보여요. 앞으로 만드는 확인 문제와 숙제 문제도 이 학년에 맞춰요.</div></div></div></${Modal}>`;
 }
 
 // ================================================================ 검수
+// 자료 검토 결과: 대본을 쓰기 전에 엔진이 자료를 훑어 소제목을 떼고, 지문이 아닌 줄·문장과 군더더기를 뺀 것
+function MaterialNote({ m, style }) {
+  const [open, setOpen] = useState(false);
+  const removed = (m && m.removed) || [];
+  const cuts = (m && m.cuts) || [];
+  const heads = (m && m.headings) || 0;
+  if (!removed.length && !cuts.length && !heads) return null;
+  const bits = [];
+  if (heads) bits.push(`소제목 ${heads}개를 문장 위로 따로 올렸어요`);
+  if (removed.length) bits.push(`지문이 아닌 줄·문장 ${removed.length}개를 뺐어요`);
+  if (cuts.length) bits.push(`문장 속 군더더기 ${cuts.length}개(${cuts.slice(0, 3).join(', ')}${cuts.length > 3 ? ' …' : ''})를 지웠어요`);
+  return html`<div class="notice" style=${style || ''}><${Icon} name="checkCircle" /><div style="min-width:0"><b>자료 검토</b> ${bits.join('. ')}.
+    ${removed.length > 0 && html` <button class="btn link" onClick=${() => setOpen(!open)}>${open ? '접기' : '뺀 것 보기'}</button>`}
+    ${open && html`<ul class="mat-list">${removed.map((r) => html`<li><span class="chip">${r.why}</span><span>${r.text}</span></li>`)}</ul>
+      <div class="faint" style="font-size:12.5px;margin-top:6px">빠지면 안 되는 문장이 빠졌으면, 새 강의에서 'AI 자료 검토'를 끄고 다시 만들어 주세요.</div>`}</div></div>`;
+}
+
 function Review({ id }) {
   const { data, loading } = useAsync(() => api(`/api/admin/lectures/${id}`), [id]);
   const [script, setScript] = useState(null);
@@ -914,7 +1310,7 @@ function Review({ id }) {
     if (data && data.lecture.script) setScript(JSON.parse(JSON.stringify(data.lecture.script)));
   }, [data]);
   // 문장·표시·단계 구성이 바뀔 때만 판서를 다시 그려요 (대본 글자를 고칠 때는 그대로)
-  const shapeKey = script ? JSON.stringify([script.sentences, script.summary, script.memo, script.vocab, (script.steps || []).map((x) => [x.view, x.n, x.show, x.focus])]) : '';
+  const shapeKey = script ? JSON.stringify([script.sentences, script.summary, script.memo, script.vocab, script.exam, (script.steps || []).map((x) => [x.view, x.n, x.show, x.focus])]) : '';
   useEffect(() => {
     if (!script || !boardRef.current || !settings || raw) return;
     const b = mountBoard(boardRef.current, script, {
@@ -1002,6 +1398,7 @@ function Review({ id }) {
     <button class="crumb" onClick=${() => go(`/lecture/${id}`)}><${Icon} name="chevronLeft" size="sm" />${lec.title}</button>
     <div class="ph"><div><h1>검수</h1><div class="sub">단계 ${steps.length}개, 대본 ${chars.toLocaleString()}자, 약 ${estMin}분 분량</div></div>
       <div class="actions"><${Seg} value=${raw ? 'raw' : 'easy'} label="편집 방식" onChange=${(v) => { if (v === 'raw') setRawText(JSON.stringify(script, null, 2)); setRaw(v === 'raw'); }} options=${[['easy', '쉬운 편집'], ['raw', '전체 데이터']]} /></div></div>
+    ${!raw && script && html`<${MaterialNote} m=${script.material} style="margin-bottom:16px" />`}
     ${problems.length > 0 && !raw && html`<div class="notice amber" style="margin-bottom:16px"><${Icon} name="alert" /><div><b>판서 표시 ${problems.length}개를 문장에서 찾지 못했어요.</b>
       <div style="font-size:13.5px">${problems.slice(0, 4).map((p) => `${p.n}번 문장 "${p.text || ''}"`).join(', ')}${problems.length > 4 ? ' …' : ''}. 전체 데이터에서 고치거나, 그대로 두면 그 표시만 빠져요.</div></div></div>`}
     ${raw ? html`<div class="panel pad"><p class="muted" style="margin-top:0;font-size:13.5px">판서 표시(박스, 밑줄, S·V 표시), 내용 정리, 메모, 핵심 단어까지 모두 고칠 수 있는 원본 데이터예요. 형식이 깨지지 않게 조심해 주세요.</p>
@@ -1019,11 +1416,11 @@ function Review({ id }) {
       </div>
       <div class="panel steps-card" ref=${listRef}>
         <div class="panel-h" style="padding-bottom:8px"><h2>대본</h2><span class="spacer"></span><span class="muted hide-m" style="font-size:13px">단계를 누르면 판서가 그 장면으로 바뀌어요</span></div>
-        <div class="say-help">대본 속 <code>{호명}</code> 자리에서 보는 학생의 이름을 불러요 (하준아). 넣거나 빼도 돼요. <code>[excited]</code> 같은 영어 표시는 ElevenLabs 목소리의 감정이에요.</div>
+        <div class="say-help">대본 속 <code>{호명}</code> 자리에서 보는 학생의 이름을 불러요 (하준아). 넣거나 빼도 돼요. <code>[excited]</code> 같은 영어 표시는 목소리에 감정을 넣는 표시예요.</div>
         <div>${(big ? [[steps[cur], cur]] : steps.map((x, i) => [x, i])).filter(([x]) => x).map(([x, i]) => {
           const sent = x.view === 'sentence' ? script.sentences.find((q) => q.n === Number(x.n)) : null;
           return html`<div class=${`step-item ${i === cur ? 'on' : ''}`} data-i=${i} onClick=${() => setCur(i)}>
-            <div class="sh"><span class="num si">${i + 1}</span><span class=${`chip ${x.view === 'sentence' ? 'ivy' : x.view === 'summary' ? 'sky' : x.view === 'memo' ? 'rose' : x.view === 'vocab' ? 'amber' : ''}`}>${VIEW_LABEL[x.view] || x.view}${x.n ? ` ${x.n}` : ''}</span>
+            <div class="sh"><span class="num si">${i + 1}</span><span class=${`chip ${x.view === 'sentence' ? 'ivy' : x.view === 'summary' ? 'sky' : x.view === 'memo' ? 'rose' : x.view === 'vocab' ? 'amber' : x.view === 'exam' ? 'board' : ''}`}>${VIEW_LABEL[x.view] || x.view}${x.n ? ` ${x.n}` : ''}</span>
               ${x.show && x.show.length ? html`<span class="faint">판서 ${x.show.length}개</span>` : null}
               ${/\{\s*호명\s*\}/.test(x.say || '') ? html`<span class="chip board" title="이 자리에서 보는 학생의 이름을 불러요">이름 부르기</span>` : null}<span class="spacer"></span>
               <span class="faint num">${(x.say || '').length}자</span>
@@ -1044,7 +1441,7 @@ function Review({ id }) {
 // ================================================================ 반: 과제, 학생, 시청표를 한곳에
 const COLORS = ['#2f7d5b', '#2f6690', '#b07a12', '#c4513a', '#6d58b0', '#1f8088', '#5b6670'];
 
-function ClassHub({ sel0, tab0, qs, info }) {
+function ClassHub({ sel0, tab0, qs, info, ltNew = 0 }) {
   const cls = useAsync(() => api('/api/admin/classes'), []);
   const [ver, setVer] = useState(0);
   const [clsModal, setClsModal] = useState(null);
@@ -1057,9 +1454,10 @@ function ClassHub({ sel0, tab0, qs, info }) {
   }, [qs]);
   const classes = cls.data ? cls.data.classes : [];
   // 반이 하나도 없으면 반 만들기부터 권해요 (반 없는 학생은 왼쪽 목록에서 볼 수 있어요)
+  const isLt = sel0 === 'lt';
   const sel = sel0 || (classes[0] ? String(classes[0].id) : '');
   const current = classes.find((c) => String(c.id) === sel) || null;
-  const tab = sel === 'none' ? 'students' : ['assign', 'students', 'watch'].includes(tab0) ? tab0 : 'assign';
+  const tab = sel === 'none' ? 'students' : ['assign', 'students', 'watch', 'scores'].includes(tab0) ? tab0 : 'assign';
   const refresh = () => {
     cls.reload(true);
     setVer((v) => v + 1);
@@ -1081,7 +1479,7 @@ function ClassHub({ sel0, tab0, qs, info }) {
   };
   if (cls.loading && !cls.data) return html`<div class="page"><div class="hub"><div><${Skel} h=${38} /><${Skel} h=${38} /><${Skel} h=${38} /></div><div><${Skel} h=${34} w="40%" mb=${20} /><${Skel} h=${260} /></div></div></div>`;
   const total = classes.reduce((a, c) => a + (c.students || 0), 0);
-  if (sel0 && sel0 !== 'none' && !current) return html`<div class="page"><div class="panel"><${Empty} icon="users" title="반을 찾을 수 없어요" action=${html`<${Btn} onClick=${() => go('/classes')}>반 목록으로</${Btn}>`}>지워졌거나 주소가 바뀌었어요.</${Empty}></div></div>`;
+  if (sel0 && sel0 !== 'none' && !isLt && !current) return html`<div class="page"><div class="panel"><${Empty} icon="users" title="반을 찾을 수 없어요" action=${html`<${Btn} onClick=${() => go('/classes')}>반 목록으로</${Btn}>`}>지워졌거나 주소가 바뀌었어요.</${Empty}></div></div>`;
   return html`<div class="page">
     <div class="hub">
       <nav class="cls-list" aria-label="반 목록">
@@ -1090,12 +1488,16 @@ function ClassHub({ sel0, tab0, qs, info }) {
           <span class="cls-dot" style=${c.color ? `background:${c.color}` : ''}></span><span class="cn">${c.name}</span><span class="cc num">${c.students}</span></button>`)}
         <button class=${`cls-item ${sel === 'none' ? 'on' : ''}`} onClick=${() => open('none')}><span class="cls-dot" style="background:#c6cec8"></span><span class="cn">반 없는 학생</span></button>
         <${Btn} kind="ghost" size="sm" icon="plus" cls="add" onClick=${() => setClsModal({})}>반 만들기</${Btn}>
+        <div class="grp">상담</div>
+        <button class=${`cls-item ${isLt ? 'on' : ''}`} aria-current=${isLt ? 'page' : undefined} onClick=${() => go('/classes/lt')}><${Icon} name="clipboard" size="sm" /><span class="cn">레벨테스트</span>${ltNew > 0 && html`<span class="cc lt-cnt num" title=${`새 결과 ${ltNew}개`}>${ltNew}</span>`}</button>
       </nav>
       <div style="min-width:0">
         <div class="cls-chips">${classes.map((c) => html`<button class=${`pick ${sel === String(c.id) ? 'on' : ''}`} onClick=${() => open(c.id)}><span class="cls-dot" style=${c.color ? `background:${c.color}` : ''}></span>${c.name}</button>`)}
           <button class=${`pick ${sel === 'none' ? 'on' : ''}`} onClick=${() => open('none')}>반 없음</button>
-          <button class="pick" onClick=${() => setClsModal({})}><${Icon} name="plus" size="sm" />반 만들기</button></div>
-        ${!sel ? html`<div class="panel"><${Empty} icon="users" title="반이 아직 없어요" action=${html`<${Btn} kind="primary" icon="plus" onClick=${() => setClsModal({})}>반 만들기</${Btn}>`}>반을 만들고 학생을 넣으면, 과제를 내고 누가 봤는지 볼 수 있어요.</${Empty}></div>`
+          <button class="pick" onClick=${() => setClsModal({})}><${Icon} name="plus" size="sm" />반 만들기</button>
+          <button class=${`pick ${isLt ? 'on' : ''}`} onClick=${() => go('/classes/lt')}><${Icon} name="clipboard" size="sm" />레벨테스트${ltNew > 0 ? html`<small class="num">${ltNew}</small>` : null}</button></div>
+        ${isLt ? html`<${LtPage} id=${/^\d+$/.test(tab0 || '') ? tab0 : null} info=${info} />`
+          : !sel ? html`<div class="panel"><${Empty} icon="users" title="반이 아직 없어요" action=${html`<${Btn} kind="primary" icon="plus" onClick=${() => setClsModal({})}>반 만들기</${Btn}>`}>반을 만들고 학생을 넣으면, 과제를 내고 누가 봤는지 볼 수 있어요.</${Empty}></div>`
           : html`
           <div class="hub-h">
             <div style="min-width:0"><h1><span class="cls-dot" style=${current && current.color ? `background:${current.color}` : current ? '' : 'background:#c6cec8'}></span>${current ? current.name : '반 없는 학생'}</h1>
@@ -1110,10 +1512,12 @@ function ClassHub({ sel0, tab0, qs, info }) {
             ${current && html`<a role="tab" aria-selected=${tab === 'assign'} class=${tab === 'assign' ? 'on' : ''} href=${`#/classes/${sel}`}>과제<span class="n num">${current.assignments}</span></a>`}
             <a role="tab" aria-selected=${tab === 'students'} class=${tab === 'students' ? 'on' : ''} href=${`#/classes/${sel}/students`}>학생${current && html`<span class="n num">${current.students}</span>`}</a>
             ${current && html`<a role="tab" aria-selected=${tab === 'watch'} class=${tab === 'watch' ? 'on' : ''} href=${`#/classes/${sel}/watch`}>시청표</a>`}
+            ${current && html`<a role="tab" aria-selected=${tab === 'scores'} class=${tab === 'scores' ? 'on' : ''} href=${`#/classes/${sel}/scores`}>성적</a>`}
           </div>
           ${tab === 'assign' && current && html`<${ClassAssign} cls=${current} ver=${ver} academy=${info.academy_name} onChanged=${refresh} key=${current.id} />`}
           ${tab === 'students' && html`<${ClassStudents} sel=${sel} ver=${ver} classes=${classes} info=${info} focusId=${query.get('s')} onAdd=${() => setAddModal(true)} onCreds=${setCreds} onChanged=${refresh} key=${sel} />`}
-          ${tab === 'watch' && current && html`<${ClassWatch} cls=${current} ver=${ver} key=${current.id} />`}`}
+          ${tab === 'watch' && current && html`<${ClassWatch} cls=${current} ver=${ver} key=${current.id} />`}
+          ${tab === 'scores' && current && html`<${ClassScores} cls=${current} ver=${ver} key=${current.id} />`}`}
       </div>
     </div>
     ${clsModal && html`<${ClassModal} cls=${clsModal} onClose=${() => setClsModal(null)} onDelete=${delCls} onDone=${(id) => { refresh(); if (id) open(id, 'students'); }} />`}
@@ -1122,14 +1526,48 @@ function ClassHub({ sel0, tab0, qs, info }) {
   </div>`;
 }
 
+// ---------------------------------------------------------------- 레벨테스트 (반 → 레벨테스트). 화면 코드는 필요할 때만 불러요
+let ltMod = null;
+function LtPage({ id, info }) {
+  const [M, setM] = useState(ltMod);
+  useEffect(() => {
+    if (!ltMod) {
+      import('./lt/admin.js')
+        .then((m) => {
+          ltMod = m;
+          setM(m);
+        })
+        .catch(toastErr);
+    }
+  }, []);
+  if (!M) return html`<div><${Skel} h=${34} w="40%" mb=${20} /><${Skel} h=${260} /></div>`;
+  return id ? html`<${M.LtDetail} id=${id} key=${id} info=${info} />` : html`<${M.LtHub} info=${info} />`;
+}
+
 function ClassAssign({ cls, ver, academy, onChanged }) {
   const { data, loading, reload } = useAsync(() => api(`/api/admin/assignments?class_id=${cls.id}`), [cls.id, ver]);
   const [editA, setEditA] = useState(null);
+  const [showClosed, setShowClosed] = useState(false);
+  const [busy, setBusy] = useState(false);
   useEvent('ivy:assigned', () => reload(true));
+  // 목록에서 지우기(정리): 선생님 과제 목록과 오늘 화면에서만 빠지고, 학생 앱은 그대로예요
+  const close = async (list, closed = true) => {
+    setBusy(true);
+    try {
+      await api('/api/admin/assignments/close', { method: 'POST', body: { ids: list.map((a) => a.id), closed } });
+      toast(!closed ? '다시 목록에 보여요' : list.length > 1 ? `과제 ${list.length}개를 목록에서 지웠어요` : '목록에서 지웠어요. 학생 앱은 그대로예요');
+      reload(true);
+      onChanged();
+    } catch (e) {
+      toastErr(e);
+    }
+    setBusy(false);
+  };
   const del = async (a) => {
-    if (!(await confirmBox({ title: '과제를 지울까요?', body: `${a.class_name} 학생 앱에서 「${a.title}」이(가) 사라져요. 시청 기록은 남아요.`, ok: '지우기', danger: true }))) return;
+    if (!(await confirmBox({ title: '학생 앱에서도 지울까요?', body: `${a.class_name} 학생 앱에서 「${a.title}」이(가) 사라져서 다시 볼 수 없어요. 시청 기록과 점수는 남아요.`, ok: '학생 앱에서도 지우기', danger: true }))) return;
     try {
       await api(`/api/admin/assignments/${a.id}`, { method: 'DELETE' });
+      toast('과제를 지웠어요');
       reload(true);
       onChanged();
     } catch (e) {
@@ -1138,16 +1576,34 @@ function ClassAssign({ cls, ver, academy, onChanged }) {
   };
   if (loading && !data) return html`<${Skel} h=${90} /><${Skel} h=${90} />`;
   const list = data ? data.assignments : [];
+  const live = list.filter((a) => !a.closed_at);
+  const closed = list.filter((a) => a.closed_at).sort((a, b) => b.closed_at - a.closed_at);
   const nowS = Date.now() / 1000;
-  const open = list.filter((a) => !a.due_at || a.due_at >= nowS).sort((a, b) => (a.due_at || 9e12) - (b.due_at || 9e12));
-  const past = list.filter((a) => a.due_at && a.due_at < nowS).sort((a, b) => b.due_at - a.due_at);
+  const isFinished = (a) => a.stats && a.stats.total > 0 && a.stats.done === a.stats.total;
+  const finished = live.filter(isFinished);
+  const open = live.filter((a) => !a.due_at || a.due_at >= nowS).sort((a, b) => (a.due_at || 9e12) - (b.due_at || 9e12));
+  const past = live.filter((a) => a.due_at && a.due_at < nowS).sort((a, b) => b.due_at - a.due_at);
   const row = (a) => html`<${AsgRow} a=${a} academy=${academy} showClass=${false} onClick=${() => go(`/lecture/${a.lecture_id}`)}
-    actions=${html`<span class="asg-acts"><button class="btn ghost icon sm" title="마감 고치기" aria-label="마감 고치기" onClick=${(e) => { e.stopPropagation(); setEditA(a); }}><${Icon} name="calendar" size="sm" /></button>
-      <button class="btn ghost icon sm" title="과제 지우기" aria-label="과제 지우기" onClick=${(e) => { e.stopPropagation(); del(a); }}><${Icon} name="trash" size="sm" /></button></span>`} />`;
-  if (!list.length) return html`<div class="panel"><${Empty} icon="send" title="이 반에 낸 과제가 없어요" action=${html`<${Btn} kind="soft" icon="send" onClick=${() => openAssign({ classId: cls.id, onDone: onChanged })}>과제 내기</${Btn}>`}>완성된 강의를 과제로 내면 학생 앱에 바로 나타나요.</${Empty}></div>`;
+    actions=${html`<span class="asg-acts">${isFinished(a) && html`<button class="btn soft sm" disabled=${busy} onClick=${(e) => { e.stopPropagation(); close([a]); }}><${Icon} name="check" size="sm" />목록에서 지우기</button>`}
+      <button class="btn ghost icon sm" title="마감 고치기" aria-label="마감 고치기" onClick=${(e) => { e.stopPropagation(); setEditA(a); }}><${Icon} name="calendar" size="sm" /></button>
+      ${!isFinished(a) && html`<button class="btn ghost icon sm" title="목록에서 지우기 (학생 앱은 그대로)" aria-label="목록에서 지우기" disabled=${busy} onClick=${(e) => { e.stopPropagation(); close([a]); }}><${Icon} name="x" size="sm" /></button>`}</span>`} />`;
+  const closedBox = closed.length > 0 && html`<section class="panel asg-closed">
+    <button class="panel-h asg-closed-h" aria-expanded=${showClosed} onClick=${() => setShowClosed(!showClosed)}><h2>목록에서 지운 과제</h2><span class="count num">${closed.length}</span><span class="spacer"></span>
+      <span class="faint" style="font-size:13px;font-weight:500">학생 앱에는 그대로 있어요</span><${Icon} name=${showClosed ? 'chevronUp' : 'chevronDown'} size="sm" /></button>
+    ${showClosed && html`<ul class="rows">${closed.map((a) => html`<li class="row asg-cl">
+      <div style="flex:1;min-width:0"><b class="ellipsis" style="display:block">${a.title}</b><span class="faint num" style="font-size:12.5px">${a.due_at ? `마감 ${fmtDate(a.due_at)}, ` : ''}${fmtDate(a.closed_at)}에 지움</span></div>
+      <button class="btn ghost sm" disabled=${busy} onClick=${() => close([a], false)}><${Icon} name="undo" size="sm" />다시 보이기</button>
+      <button class="btn ghost icon sm" title="학생 앱에서도 지우기" aria-label="학생 앱에서도 지우기" onClick=${() => del(a)}><${Icon} name="trash" size="sm" /></button></li>`)}</ul>`}
+  </section>`;
+  if (!live.length) {
+    return html`<div class="stack lg"><div class="panel"><${Empty} icon="send" title=${closed.length ? '진행 중인 과제가 없어요' : '이 반에 낸 과제가 없어요'} action=${html`<${Btn} kind="soft" icon="send" onClick=${() => openAssign({ classId: cls.id, onDone: onChanged })}>과제 내기</${Btn}>`}>완성된 강의를 과제로 내면 학생 앱에 바로 나타나요.</${Empty}></div>${closedBox}</div>`;
+  }
   return html`<div class="stack lg">
+    ${finished.length > 0 && html`<div class="notice asg-done-bar"><${Icon} name="checkCircle" /><div style="flex:1;min-width:0"><b>다 끝낸 과제가 ${finished.length}개 있어요</b><div class="muted" style="font-size:13px">반 학생 모두 강의를 다 보고 숙제까지 냈어요. 목록에서 지워도 학생 앱에는 그대로 있어서 다시 볼 수 있어요.</div></div>
+      <${Btn} size="sm" icon="check" busy=${busy} onClick=${() => close(finished)}>${finished.length > 1 ? '모두 목록에서 지우기' : '목록에서 지우기'}</${Btn}></div>`}
     ${open.length > 0 && html`<section class="panel"><div class="panel-h"><h2>진행 중</h2><span class="count num">${open.length}</span></div><ul class="rows">${open.map(row)}</ul></section>`}
     ${past.length > 0 && html`<section class="panel"><div class="panel-h"><h2>마감 지난 과제</h2><span class="count num">${past.length}</span></div><ul class="rows">${past.map(row)}</ul></section>`}
+    ${closedBox}
     ${editA && html`<${DueModal} a=${editA} onClose=${() => setEditA(null)} onDone=${() => reload(true)} />`}
   </div>`;
 }
@@ -1206,10 +1662,16 @@ function ClassStudents({ sel, ver, classes, info, focusId, onAdd, onCreds, onCha
 }
 
 function ClassWatch({ cls, ver }) {
-  const { data, loading, reload } = useAsync(() => api(`/api/admin/watch?class_id=${cls.id}`), [cls.id, ver]);
+  const { data: raw, loading, reload } = useAsync(() => api(`/api/admin/watch?class_id=${cls.id}`), [cls.id, ver]);
   const [cell, setCell] = useState(null);
   const [stu, setStu] = useState(null);
   const [thr, setThr] = useState(90);
+  const [allCols, setAllCols] = useState(false);
+  // 목록에서 지운(끝난) 과제는 시청표에서도 감춰요. 엑셀로 받기에는 모두 들어가요
+  const closedN = raw ? raw.lectures.filter((l) => l.closed_at).length : 0;
+  const data = raw && !allCols ? { ...raw, lectures: raw.lectures.filter((l) => !l.closed_at) } : raw;
+  // 끝냄: 강의를 다 보고, 숙제가 있으면 숙제까지 냄
+  const fin = (l, c) => !!(c && c.completed_at && (!l.hw_n || c.hw));
   useEffect(() => {
     api('/api/admin/settings').then((r) => setThr(r.settings.complete_threshold)).catch(() => {});
     const t = setInterval(() => reload(true), 30000);
@@ -1217,29 +1679,32 @@ function ClassWatch({ cls, ver }) {
   }, [cls.id]);
   if (loading && !data) return html`<${Skel} h=${300} />`;
   if (!data) return null;
-  if (!data.lectures.length) return html`<div class="panel"><${Empty} icon="clipboard" title="이 반에 낸 과제가 없어요" action=${html`<${Btn} kind="soft" icon="send" onClick=${() => openAssign({ classId: cls.id, onDone: () => reload(true) })}>과제 내기</${Btn}>`}>완성된 강의를 과제로 내면 시청 기록이 쌓여요.</${Empty}></div>`;
+  const showAll = closedN > 0 && html`<label class="wt-all"><input type="checkbox" checked=${allCols} onChange=${(e) => setAllCols(e.target.checked)} />목록에서 지운 과제도 보기 (${closedN})</label>`;
+  if (!data.lectures.length) return html`<div class="panel"><${Empty} icon="clipboard" title=${closedN ? '진행 중인 과제가 없어요' : '이 반에 낸 과제가 없어요'} action=${closedN ? showAll : html`<${Btn} kind="soft" icon="send" onClick=${() => openAssign({ classId: cls.id, onDone: () => reload(true) })}>과제 내기</${Btn}>`}>완성된 강의를 과제로 내면 시청 기록이 쌓여요.</${Empty}></div>`;
   if (!data.students.length) return html`<div class="panel"><${Empty} icon="userPlus" title="이 반에 학생이 없어요" /></div>`;
   return html`<div class="panel" style="overflow:hidden">
     <div class="row wrap" style="padding:14px 18px;border-bottom:1px solid var(--line-2)"><div class="legend">
-      <span><i class="cell done"></i>${thr}% 이상 완료</span><span><i class="cell part"></i>보는 중</span><span><i class="cell none"></i>안 봄</span><span><i class="cell none late"></i>마감 지남</span></div>
-      <span class="spacer"></span><span class="faint hide-m" style="font-size:12.5px">30초마다 새로 고쳐져요</span>
+      <span><i class="cell done"></i>${thr}% 이상 봄</span><span><i class="cell part"></i>보는 중</span><span><i class="cell none"></i>안 봄</span><span><i class="cell none late"></i>마감 지남</span></div>
+      <span class="spacer"></span>${showAll}<span class="faint hide-m" style="font-size:12.5px">30초마다 새로 고쳐져요</span>
       <a class="btn secondary sm" href=${`/api/admin/watch.csv?class_id=${cls.id}`}><${Icon} name="download" size="sm" />엑셀로 받기</a></div>
     <div class="table-wrap" style="max-height:70vh"><table class="matrix">
       <thead><tr><th class="sticky">학생</th>${data.lectures.map((l) => {
-        const done = data.students.filter((s) => data.cells[s.id] && data.cells[s.id][l.id] && data.cells[s.id][l.id].completed_at).length;
-        return html`<th class="lh"><div class="clamp2">${l.title}</div><div class="due">${l.due_at ? `${fmtDate(l.due_at)}까지` : '마감 없음'}</div><div class="sum num">${done}/${data.students.length} 완료</div></th>`;
+        const done = data.students.filter((s) => fin(l, data.cells[s.id] && data.cells[s.id][l.id])).length;
+        return html`<th class=${`lh ${l.closed_at ? 'closed' : ''}`}><div class="clamp2">${l.title}</div><div class="due">${l.closed_at ? '목록에서 지움' : l.due_at ? `${fmtDate(l.due_at)}까지` : '마감 없음'}</div><div class="sum num">${done}/${data.students.length} 끝냄</div></th>`;
       })}</tr></thead>
       <tbody>${data.students.map((s) => {
         const row = data.cells[s.id] || {};
-        const doneN = data.lectures.filter((l) => row[l.id] && row[l.id].completed_at).length;
+        const doneN = data.lectures.filter((l) => fin(l, row[l.id])).length;
         return html`<tr><td class="sticky" style="cursor:pointer" onClick=${() => setStu(s)}><div style="font-weight:700">${s.name}</div>
-          <div class="faint" style="font-size:12px">${doneN}/${data.lectures.length} 완료, ${s.last_login_at ? `접속 ${ago(s.last_login_at)}` : '접속 전'}</div></td>
+          <div class="faint" style="font-size:12px">${doneN}/${data.lectures.length} 끝냄, ${s.last_login_at ? `접속 ${ago(s.last_login_at)}` : '접속 전'}</div></td>
           ${data.lectures.map((l) => {
             const c = row[l.id];
             const late = l.due_at && l.due_at * 1000 < Date.now() && !(c && c.completed_at);
             const k = !c || !c.percent ? 'none' : c.completed_at ? 'done' : 'part';
             return html`<td class="c"><span class=${`cell ${k} ${late ? 'late' : ''}`} onClick=${() => setCell({ s, l, c })}>
-              ${k === 'done' ? html`<${Icon} name="check" size="sm" />` : null}${c && c.percent ? `${c.percent}%` : '–'}</span></td>`;
+              ${k === 'done' ? html`<${Icon} name="check" size="sm" />` : null}${c && c.percent ? `${c.percent}%` : '–'}</span>
+              ${l.quiz_n > 0 && html`<span class=${`qcell num ${c && c.quiz ? '' : 'none'}`} title="확인 문제">${c && c.quiz ? `${c.quiz.score}/${c.quiz.total}` : '문제 –'}</span>`}
+              ${l.hw_n > 0 && html`<span class=${`qcell hcell num ${c && c.hw ? '' : 'none'}`} title="숙제">${c && c.hw ? `숙제 ${c.hw.score}/${c.hw.total}` : '숙제 –'}</span>`}</td>`;
           })}</tr>`;
       })}</tbody></table></div>
     ${cell && html`<${Modal} title=${cell.s.name} onClose=${() => setCell(null)}>
@@ -1248,7 +1713,10 @@ function ClassWatch({ cls, ver }) {
           <div class="stack" style="gap:4px"><div><b>${cell.c && cell.c.completed_at ? '다 봤어요' : cell.c && cell.c.percent ? '보는 중이에요' : '아직 안 봤어요'}</b></div>
             ${cell.c && html`<div class="muted" style="font-size:14px">본 시간 ${fmtDur(cell.c.watched)} / ${fmtDur(cell.l.duration)}</div>
               <div class="muted" style="font-size:14px">마지막 시청 ${fmtDate(cell.c.updated_at, true)}</div><div class="muted" style="font-size:14px">재생 ${cell.c.views || 1}번</div>`}
-            ${cell.c && cell.c.completed_at && html`<div class="muted" style="font-size:14px">완료 ${fmtDate(cell.c.completed_at, true)}</div>`}</div></div></div></${Modal}>`}
+            ${cell.c && cell.c.completed_at && html`<div class="muted" style="font-size:14px">완료 ${fmtDate(cell.c.completed_at, true)}</div>`}
+            ${cell.l.quiz_n > 0 && html`<div style="font-size:14px">${cell.c && cell.c.quiz ? html`확인 문제 <b class="num">${cell.c.quiz.score}/${cell.c.quiz.total}</b> <span class="muted">(${fmtDate(cell.c.quiz.created_at, true)})</span>` : html`<span class="muted">확인 문제는 아직 안 풀었어요</span>`}</div>`}
+            ${cell.l.hw_n > 0 && html`<div style="font-size:14px">${cell.c && cell.c.hw ? html`숙제 <b class="num">${cell.c.hw.score}/${cell.c.hw.total}</b> <span class="muted">(${fmtDate(cell.c.hw.created_at, true)})</span>` : html`<span class="muted">숙제는 아직 안 냈어요</span>`}</div>`}
+            <button class="btn link" style="font-size:13.5px;justify-content:flex-start" onClick=${() => go(`/lecture/${cell.l.id}`)}>강의 화면에서 답안 보기</button></div></div></div></${Modal}>`}
     ${stu && html`<${StudentProgressModal} student=${stu} onClose=${() => setStu(null)} />`}
   </div>`;
 }
@@ -1262,7 +1730,7 @@ function StudentProgressModal({ student, onClose }) {
         const d = dueLabel(l.due_at);
         return html`<li><div class="row" style="gap:12px"><div style="flex:1;min-width:0"><div class="ellipsis" style="font-weight:700">${l.title}</div>
           <div class="row" style="margin-top:6px;gap:10px"><div style="flex:1"><${Bar} value=${l.percent} tone=${l.completed_at ? '' : 'seen'} /></div><b class="num" style="font-size:13px">${l.percent}%</b></div>
-          <div class="faint" style="font-size:12px;margin-top:3px">${l.updated_at ? `마지막 ${ago(l.updated_at)}` : '안 봄'}${l.due_at ? `, ${fmtDate(l.due_at)}까지` : ''}</div></div>
+          <div class="faint" style="font-size:12px;margin-top:3px">${l.updated_at ? `마지막 ${ago(l.updated_at)}` : '안 봄'}${l.due_at ? `, ${fmtDate(l.due_at)}까지` : ''}${l.quiz_n > 0 ? `, 확인 문제 ${l.quiz_score !== null ? `${l.quiz_score}/${l.quiz_total}` : '안 풂'}` : ''}${l.hw_n > 0 ? `, 숙제 ${l.hw_score !== null ? `${l.hw_score}/${l.hw_total}` : '안 냄'}` : ''}</div></div>
           ${l.completed_at ? html`<span class="chip ivy"><${Icon} name="check" size="sm" />완료</span>` : d && html`<span class=${`chip ${d.tone}`}>${d.text}</span>`}</div></li>`;
       })}</ul>` : html`<${Empty} title="받은 과제가 없어요" />`}</div>`}
   </${Modal}>`;
@@ -1395,7 +1863,7 @@ function SettingsAcademy({ onInfo }) {
   if (!f) return html`<${Skel} h=${30} w="40%" mb=${20} /><${Skel} h=${240} />`;
   const s = data.settings;
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
-  const dirty = ['academy_name', 'app_name', 'header_text', 'complete_threshold', 'prevent_skip', 'default_minutes', 'default_tone'].some((k) => String(f[k] ?? '') !== String(s[k] ?? ''));
+  const dirty = ['academy_name', 'app_name', 'header_text', 'academy_phone', 'complete_threshold', 'prevent_skip', 'default_minutes', 'default_tone'].some((k) => String(f[k] ?? '') !== String(s[k] ?? ''));
   const save = async () => {
     setBusy('save');
     try {
@@ -1429,10 +1897,11 @@ function SettingsAcademy({ onInfo }) {
           <div class="stack" style="gap:6px"><div style="font-weight:700">로고</div><div class="row" style="gap:8px">
             <label class="btn secondary sm" style="cursor:pointer">${busy === 'logo' ? '올리는 중…' : '바꾸기'}<input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="sr" onChange=${(e) => upLogo(e.target.files[0])} /></label>
             ${s.logo_url && html`<${Btn} kind="ghost" size="sm" onClick=${async () => { await api('/api/admin/logo', { method: 'DELETE' }); reload(true); if (onInfo) onInfo(); }}>지우기</${Btn}>`}</div>
-            <div class="faint" style="font-size:12.5px">앱 아이콘 자리와 판서 워터마크에 써요. 정사각형 그림이 좋아요.</div></div></div>
+            <div class="faint" style="font-size:12.5px">앱 아이콘 자리와 판서 영상·PDF 워터마크에 써요. 정사각형 그림이 좋아요.</div></div></div>
         <div class="grid2"><${Field} label="학원 이름"><input value=${f.academy_name} onInput=${set('academy_name')} /></${Field}>
           <${Field} label="앱 이름" hint="학생 앱 위쪽과 로그인 화면에 보여요"><input value=${f.app_name} onInput=${set('app_name')} /></${Field}></div>
-        <${Field} label="판서 머리글 (선택)" hint="비우면 강의 출처가 들어가요"><input value=${f.header_text} onInput=${set('header_text')} placeholder="예: 고1 내신 대비반" /></${Field}>
+        <div class="grid2"><${Field} label="판서 머리글 (선택)" hint="비우면 강의 출처가 들어가요"><input value=${f.header_text} onInput=${set('header_text')} placeholder="예: 고1 내신 대비반" /></${Field}>
+          <${Field} label="학원 전화번호 (선택)" hint="출력용 숙제지 아래쪽에 들어가요"><input value=${f.academy_phone || ''} onInput=${set('academy_phone')} placeholder="예: 031-000-0000" inputmode="tel" /></${Field}></div>
       </div></section>
       <section class="panel"><div class="panel-h"><h2>시청 규칙</h2></div><div class="panel-b stack">
         <div class="stack sm"><div class="label">완료로 칠 기준</div><${Seg} value=${Number(f.complete_threshold)} onChange=${(v) => setF({ ...f, complete_threshold: v })} options=${[[80, '80%'], [90, '90%'], [95, '95%'], [100, '100%']]} />
@@ -1441,7 +1910,7 @@ function SettingsAcademy({ onInfo }) {
       </div></section>
       <section class="panel"><div class="panel-h"><h2>새 강의 기본값</h2></div><div class="panel-b stack">
         <div class="stack sm"><div class="label">강의 길이</div><${Seg} value=${Number(f.default_minutes)} onChange=${(v) => setF({ ...f, default_minutes: v })} options=${[[10, '10분'], [15, '15분'], [20, '20분']]} /></div>
-        <div class="stack sm"><div class="label">말투</div><${Seg} value=${f.default_tone} onChange=${(v) => setF({ ...f, default_tone: v })} options=${[['banmal', '반말 강의체'], ['jondaet', '존댓말']]} /></div>
+        <div class="stack sm"><div class="label">말투</div><${Seg} value=${f.default_tone} onChange=${(v) => setF({ ...f, default_tone: v })} options=${TONE_OPTS} /></div>
       </div></section>
       ${dirty && html`<div class="bottom-bar"><span class="muted" style="align-self:center;font-size:13px;margin-right:auto">저장하지 않은 변경이 있어요</span><${Btn} kind="primary" icon="save" busy=${busy === 'save'} onClick=${save}>저장</${Btn}></div>`}
     </div>`;
@@ -1500,7 +1969,7 @@ function SettingsEngine() {
           <div class="ed">${on ? `${info.host || '학원 PC'}에서 ${info.status || '대기 중'}` : s.engine_connected ? `마지막 연결 ${ago(s.engine_last_seen)}. 학원 PC에서 제작 엔진을 켜 주세요.` : '아래 순서대로 학원 PC에 설치해 주세요.'}</div></div>
         <span class=${`eng-dot ${on ? 'on' : s.engine_connected ? 'off' : ''}`}></span>
       </div>
-      ${s.engine_info && html`<div class="eng-info"><span><i>PC</i>${info.host || '학원 PC'}</span><span><i>버전</i>${info.version || '-'}</span>${info.voice ? html`<span><i>목소리</i>${info.voice}</span>` : null}<span><i>마지막 연결</i>${ago(s.engine_last_seen)}</span></div>`}
+      ${s.engine_info && html`<div class="eng-info"><span><i>PC</i>${info.host || '학원 PC'}</span><span><i>버전</i>${info.version || '-'}</span><span><i>마지막 연결</i>${ago(s.engine_last_seen)}</span></div>`}
       <section class="panel"><div class="panel-h"><h2>${s.engine_connected ? '다른 PC에 설치하거나 다시 설치하기' : '설치하기'}</h2></div><div class="panel-b stack">
         <ol class="how">
           <li>학원 PC(윈도우)에서 이 사이트에 로그인해요.</li>
@@ -1707,7 +2176,7 @@ function BoardStyle() {
         <section class="panel pad stack">
           <div class="row"><div style="flex:1"><div style="font-weight:750">내 판서 규칙</div><div class="muted" style="font-size:13.5px;margin-top:2px">AI가 대본과 판서를 쓸 때 이 규칙을 따라요. 새로 만드는 강의부터 적용돼요.</div></div>
             ${st.rules !== DEFAULT_STYLE.rules && html`<${Btn} kind="ghost" size="sm" onClick=${() => set({ rules: DEFAULT_STYLE.rules })}>처음 규칙으로</${Btn}>`}</div>
-          <textarea class="input" style="height:230px;padding:12px;line-height:1.6;font-size:14px" value=${st.rules} onInput=${(e) => set({ rules: e.target.value })}
+          <textarea class="input" style="height:340px;padding:12px;line-height:1.6;font-size:14px" value=${st.rules} onInput=${(e) => set({ rules: e.target.value })}
             placeholder=${'예)\n- 관계사절은 꼭 박스로 묶고 선행사에 화살표\n- 연결어(However, Yet 등)는 빠짐없이 동그라미\n- 수일치가 나오면 동사 위에 "수일치" 메모\n- 끊어 읽기 슬래시는 문장마다 2~3개'}></textarea>
         </section>
         <div class="notice"><${Icon} name="info" /><div style="font-size:13.5px">이미 만든 영상은 그대로예요. 바꾼 스타일로 다시 만들려면 강의 화면에서 <b>대본 고쳐서 다시 만들기 → 저장하고 영상 만들기</b>를 눌러 주세요.</div></div>

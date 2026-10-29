@@ -400,23 +400,31 @@
    "id": "memo4",
    "text": "어법 포인트: caught (catching ✕) · are (is ✕) · where (which ✕) · occurs (is occurred ✕) · falling (fallen ✕)",
    "tone": "blue"
-  },
-  {
-   "id": "memo5",
-   "text": "유의어: formidable ≈ fearsome · comparable ≈ similar · subsequent ≈ later   반의어: infrequency ↔ frequency",
-   "tone": "green"
   }
  ],
  "vocab": [
   {
    "id": "v1",
    "en": "formidable",
-   "ko": "가공할 만한, 무시무시한"
+   "ko": "가공할 만한, 무시무시한",
+   "syn": [
+    "fearsome",
+    "intimidating"
+   ],
+   "ant": [
+    "harmless"
+   ]
   },
   {
    "id": "v2",
    "en": "infrequency",
-   "ko": "드묾, 빈도가 낮음"
+   "ko": "드묾, 빈도가 낮음",
+   "syn": [
+    "rarity"
+   ],
+   "ant": [
+    "frequency"
+   ]
   },
   {
    "id": "v3",
@@ -426,37 +434,76 @@
   {
    "id": "v4",
    "en": "accumulated",
-   "ko": "축적된, 쌓인"
+   "ko": "축적된, 쌓인",
+   "syn": [
+    "collected",
+    "gathered"
+   ]
   },
   {
    "id": "v5",
    "en": "aggressor",
-   "ko": "공격자"
+   "ko": "공격자",
+   "syn": [
+    "attacker"
+   ],
+   "ant": [
+    "victim"
+   ]
   },
   {
    "id": "v6",
    "en": "unsuspecting",
-   "ko": "아무것도 모르는"
+   "ko": "아무것도 모르는",
+   "syn": [
+    "unaware"
+   ],
+   "ant": [
+    "wary"
+   ]
   },
   {
    "id": "v7",
    "en": "subsequent",
-   "ko": "그 이후의, 뒤이은"
+   "ko": "그 이후의, 뒤이은",
+   "syn": [
+    "following",
+    "later"
+   ],
+   "ant": [
+    "previous"
+   ]
   },
   {
    "id": "v8",
    "en": "comparable",
-   "ko": "비슷한, 비교할 만한"
+   "ko": "비슷한, 비교할 만한",
+   "syn": [
+    "similar"
+   ],
+   "ant": [
+    "different"
+   ]
   },
   {
    "id": "v9",
    "en": "bystander",
-   "ko": "구경꾼, 방관자"
+   "ko": "구경꾼, 방관자",
+   "syn": [
+    "onlooker"
+   ]
   },
   {
    "id": "v10",
    "en": "inherent",
-   "ko": "내재된, 고유한"
+   "ko": "내재된, 고유한",
+   "syn": [
+    "intrinsic",
+    "built-in"
+   ],
+   "ant": [
+    "external"
+   ]
   }
  ],
  "practice": {
@@ -707,15 +754,14 @@
   },
   {
    "view": "memo",
-   "say": "어법 포인트도 한 번에 모아 볼게. caught, are, where, occurs, falling. 다섯 개 모두 시험에 그대로 나올 수 있는 자리니까 왜 그런지 이유까지 같이 외워 둬. 유의어도 같이 보자. formidable은 fearsome, comparable은 similar, subsequent는 later랑 바꿔 쓸 수 있어.",
+   "say": "어법 포인트도 한 번에 모아 볼게. caught, are, where, occurs, falling. 다섯 개 모두 시험에 그대로 나올 수 있는 자리니까 왜 그런지 이유까지 같이 외워 둬.",
    "show": [
-    "memo4",
-    "memo5"
+    "memo4"
    ]
   },
   {
    "view": "vocab",
-   "say": "마지막으로 핵심 단어야. formidable 가공할 만한, infrequency 드묾, a considerable number of 상당수의, aggressor 공격자, unsuspecting 아무것도 모르는. subsequent 그 이후의, comparable 비슷한, bystander 구경꾼, inherent 내재된. 판서노트에 다 정리되어 있으니까 꼭 복습해.",
+   "say": "핵심 단어 보자. formidable 무시무시한, 비슷한 말 fearsome, 반대말 harmless. 어휘 문제에서 이 둘을 바꿔 놓는 경우가 많아. infrequency 드묾, 반대말 frequency. aggressor 공격자, 반대는 victim. subsequent 그 이후의, 반대말 previous. comparable 비슷한, similar랑 같은 뜻이야. 나머지 단어도 판서노트에 유의어, 반의어까지 정리해 뒀으니까 꼭 복습해.",
    "show": [
     "v1",
     "v2",
@@ -727,6 +773,18 @@
     "v8",
     "v9",
     "v10"
+   ]
+  },
+  {
+   "view": "exam",
+   "say": "마지막으로 이 지문이 시험에 어떻게 나올지 정리해 보자. 어법은 1번 caught. discover themselves 뒤 목적격 보어 자리라서 과거분사야. 3번 are도 봐. 주어가 instances, 복수니까 are. 어휘 문제는 formidable을 harmless로 바꿔 놓고 틀린 낱말 고르기로 잘 나와. 빈칸은 결론 7번의 complexity, 순서 문제는 Yet에서 반전, Similarly에서 두 번째 사례로 끊길 거야. 주제는 야생의 비극은 겉보기보다 복잡하다. 근거는 7번 문장이야.",
+   "show": [
+    "ex1",
+    "ex2",
+    "ex3",
+    "ex4",
+    "ex5",
+    "ex6"
    ]
   },
   {
@@ -761,5 +819,43 @@
    "hot": true
   }
  ],
- "call_names": true
+ "call_names": true,
+ "exam": [
+  {
+   "id": "ex1",
+   "k": "어법",
+   "text": "1번 caught: 목적격 보어 자리라 과거분사",
+   "n": "1"
+  },
+  {
+   "id": "ex2",
+   "k": "어법",
+   "text": "3번 are: 주어 instances가 복수라 수일치",
+   "n": "3"
+  },
+  {
+   "id": "ex3",
+   "k": "어휘",
+   "text": "2번 formidable을 harmless로 바꾼 틀린 낱말",
+   "n": "2"
+  },
+  {
+   "id": "ex4",
+   "k": "빈칸",
+   "text": "7번 결론의 complexity가 빈칸으로",
+   "n": "7"
+  },
+  {
+   "id": "ex5",
+   "k": "순서",
+   "text": "4번 Yet 반전, 6번 Similarly 사례에서 순서 나누기",
+   "n": "4-6"
+  },
+  {
+   "id": "ex6",
+   "k": "주제",
+   "text": "야생 비극은 겉보기보다 복잡하다, 근거는 7번",
+   "n": "7"
+  }
+ ]
 }

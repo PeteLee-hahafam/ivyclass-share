@@ -2,6 +2,7 @@ import {
   html, useState, useEffect, useRef, api, Icon, Btn, Field, Bar, Ring, Empty, Skel, toast, toastErr, fmtDur, fmtMin, fmtDate, ago, dueLabel, initial, useRoute, go,
 } from './ui.js';
 import { Player } from './player.js';
+import { StudentQuiz, QuizEntry, HomeworkEntry, MockEntry, StudentMock } from './quizview.js';
 
 // ------------------------------------------------------------ 시청 구간 비트맵 (1초 = 1비트)
 function decodeBits(b64, n) {
@@ -40,14 +41,18 @@ export function StudentApp({ info, me, onLogout, preview }) {
   const parts = route.split('?')[0].split('/');
   let page;
   if (parts[1] === 'watch') page = html`<${Watch} id=${parts[2]} key=${parts[2]} q=${q} nav=${nav} preview=${preview} />`;
+  else if (parts[1] === 'quiz') page = html`<${StudentQuiz} id=${parts[2]} key=${`q${parts[2]}`} q=${q} nav=${nav} preview=${preview} />`;
+  else if (parts[1] === 'hw') page = html`<${StudentQuiz} kind="hw" id=${parts[2]} key=${`h${parts[2]}`} q=${q} nav=${nav} preview=${preview} />`;
+  else if (parts[1] === 'mock') page = html`<${StudentMock} id=${parts[2]} key=${`m${parts[2]}`} q=${q} nav=${nav} preview=${preview} />`;
+  else if (parts[1] === 'exam') page = html`<${StudentQuiz} kind="exam" id=${parts[2]} key=${`e${parts[2]}`} q=${q} nav=${nav} preview=${preview} />`;
   else if (parts[1] === 'done') page = html`<${Home} q=${q} nav=${nav} info=${info} doneOnly />`;
   else if (parts[1] === 'me') page = html`<${Me} q=${q} me=${me} info=${info} onLogout=${onLogout} preview=${preview} />`;
   else page = html`<${Home} q=${q} nav=${nav} info=${info} />`;
   const tab = parts[1] || '';
-  return html`<div class="sapp" ref=${scrRef}>
+  return html`<div class=${`sapp ${['quiz', 'hw', 'mock', 'exam'].includes(tab) ? 'qz' : ''}`} ref=${scrRef}>
     ${preview && html`<div class="pv-banner"><${Icon} name="eye" size="sm" />미리보기예요. 여기서 본 기록은 남지 않아요</div>`}
     ${page}
-    ${tab !== 'watch' && html`<nav class="s-tabbar"><div class="in">
+    ${!['watch', 'quiz', 'hw', 'mock', 'exam'].includes(tab) && html`<nav class="s-tabbar"><div class="in">
       ${[['', 'home', '홈'], ['done', 'trophy', '다 본 강의'], ['me', 'user', '내 정보']].map(
         ([p, ic, label]) => html`<a href=${preview ? undefined : `#/${p}`} class=${tab === p ? 'on' : ''} onClick=${(e) => { if (preview) { e.preventDefault(); nav('/' + p); } }}><${Icon} name=${ic} size="lg" />${label}</a>`,
       )}</div></nav>`}
@@ -76,12 +81,27 @@ function LectureCard({ l, nav }) {
     <div class="info">
       <div class="st">${l.title}</div>
       <div class="ss ellipsis">${[l.source, fmtMin(l.duration)].filter(Boolean).join(', ')}</div>
+      ${((l.quiz_n > 0 && (l.quiz_score !== null || done)) || (l.hw_n > 0 && (l.hw_score !== null || done))) && html`<div class="s-chips">
+        ${l.quiz_n > 0 && (l.quiz_score !== null || done) && html`<span class=${`chip ${l.quiz_score !== null ? 'ivy' : 'amber'}`}><${Icon} name="circleHelp" size="sm" />${l.quiz_score !== null ? `확인 문제 ${l.quiz_score}/${l.quiz_total}` : '확인 문제 안 풀었어요'}</span>`}
+        ${l.hw_n > 0 && (l.hw_score !== null || done) && html`<span class=${`chip ${l.hw_score !== null ? 'ivy' : 'amber'}`}><${Icon} name="clipboard" size="sm" />${l.hw_score !== null ? `숙제 ${l.hw_score}/${l.hw_total}` : '숙제 안 냈어요'}</span>`}</div>`}
       ${done ? html`<div class="faint" style="font-size:12.5px">${fmtDate(l.completed_at)}에 다 봤어요</div>`
         : html`<div class="row" style="gap:8px"><div style="flex:1"><${Bar} value=${l.percent} thin /></div><span class="num" style="font-size:12.5px;font-weight:800;color:${l.percent ? 'var(--ink)' : 'var(--faint)'}">${l.percent}%</span></div>
           <div class="faint" style="font-size:12px">${l.percent > 0 ? `${fmtDur(l.last_pos)}부터 이어 보기` : '아직 안 봤어요'}</div>`}
     </div>
     ${!done && d && html`<span class=${`due-note ${d.tone === 'rose' || d.tone === 'amber' ? 'hot' : ''}`}>${d.text}</span>`}
   </div>`;
+}
+
+// 선생님이 낸 시험 한 줄 (풀기, 점수, 마감)
+function ExamCard({ e, nav }) {
+  const d = dueLabel(e.due_at);
+  const done = e.score !== null;
+  return html`<button class=${`card s-exam ${done ? 'done' : ''}`} onClick=${() => nav(`/exam/${e.id}`)}>
+    <span class="se-ic"><${Icon} name="clipboardCheck" /></span>
+    <span class="info"><span class="st">${e.title}</span>
+      <span class="ss">${e.n}문항${done ? `, ${fmtDate(e.done_at)}에 냈어요` : e.closed ? ', 마감됐어요' : e.due_at ? `, ${fmtDate(e.due_at)}까지` : ''}</span></span>
+    ${done ? html`<span class="chip ivy num">${e.score}/${e.total}</span>` : e.closed ? html`<span class="chip">마감</span>` : html`<span class=${`chip ${d && (d.tone === 'rose' || d.tone === 'amber') ? 'rose' : 'amber'}`}>${d && d.tone ? d.text : '풀기'}</span>`}
+  </button>`;
 }
 
 // ------------------------------------------------------------ 홈 / 다 본 강의
@@ -100,6 +120,11 @@ function Home({ q, nav, info, doneOnly }) {
   const all = data.lectures;
   const todo = all.filter((l) => !l.completed_at);
   const done = all.filter((l) => l.completed_at);
+  // 시험: 풀 것 먼저(마감 가까운 차례), 그다음 푼 것(최근 2주), 마감된 것은 빼요
+  const exams = data.exams || [];
+  const exTodo = exams.filter((e) => e.score === null && !e.closed).sort((a, b) => (a.due_at || 9e12) - (b.due_at || 9e12));
+  const exDone = exams.filter((e) => e.score !== null);
+  const exRecent = exDone.filter((e) => e.done_at > Date.now() / 1000 - 14 * 86400);
   const name = data.student.name;
   const firstName = name.length >= 3 ? name.slice(1) : name;
   const nextDue = todo.filter((l) => l.due_at).sort((a, b) => a.due_at - b.due_at)[0];
@@ -109,6 +134,7 @@ function Home({ q, nav, info, doneOnly }) {
       <div class="s-body">
         ${done.length ? html`<div class="sec-h">완료한 강의 <span class="num">${done.length}</span></div>${done.map((l) => html`<${LectureCard} l=${l} nav=${nav} />`)}`
           : html`<div class="card" style="margin-top:8px"><${Empty} icon="trophy" title="아직 다 본 강의가 없어요">강의를 끝까지 보면 여기에 모여요.</${Empty}></div>`}
+        ${exDone.length > 0 && html`<div class="sec-h" style="margin-top:22px">푼 시험 <span class="num">${exDone.length}</span></div>${exDone.map((e) => html`<${ExamCard} e=${e} nav=${nav} />`)}`}
       </div>`;
   }
   return html`<${TopBar} info=${info} right=${right} />
@@ -122,6 +148,8 @@ function Home({ q, nav, info, doneOnly }) {
         <${Ring} value=${(done.length / all.length) * 100} size=${72} stroke=${7} label=${`${done.length}/${all.length}`} />
       </section>` : html`<div class="hello"><h2>${firstName}님, 안녕하세요</h2><p>${data.student.class_name ? `${data.student.class_name}, ` : ''}오늘도 한 강의씩 끝내 봐요.</p></div>`}
       ${!data.student.class_name ? html`<div class="notice amber" style="margin-bottom:16px"><${Icon} name="info" /><div>아직 반이 정해지지 않았어요. 선생님께 말씀드려 주세요.</div></div>` : null}
+      ${(exTodo.length > 0 || exRecent.length > 0) && html`<div class="sec-h">시험 ${exTodo.length > 0 && html`<span class="num">${exTodo.length}</span>`}</div>
+        ${exTodo.map((e) => html`<${ExamCard} e=${e} nav=${nav} />`)}${exRecent.map((e) => html`<${ExamCard} e=${e} nav=${nav} />`)}`}
       ${all.length === 0 ? html`<div class="card"><${Empty} icon="video" title="아직 받은 강의가 없어요">선생님이 강의를 내 주면 여기에 나타나요.</${Empty}></div>`
         : html`<div class="sec-h">해야 할 강의 <span class="num">${todo.length}</span></div>
           ${todo.length ? todo.map((l) => html`<${LectureCard} l=${l} nav=${nav} />`)
@@ -354,6 +382,9 @@ function Watch({ id, q, nav, preview }) {
         <div class="hl-track"><i style=${`width:${pct}%`}></i></div>
         <div class="faint" style="font-size:12.5px;margin-top:8px">영상 아래 노란 줄이 실제로 본 곳이에요. 빨리 넘긴 곳은 빠져요.</div>
       </div>
+      <${QuizEntry} id=${l.id} quiz=${data.quiz} result=${data.quiz_result} completed=${completed} nav=${nav} />
+      <${HomeworkEntry} id=${l.id} hw=${data.homework} result=${data.homework_result} nav=${nav} />
+      <${MockEntry} id=${l.id} mock=${data.mock} nav=${nav} />
       ${chapters.length > 0 && html`<div class="card w-toc"><div class="label" style="margin-bottom:6px"><${Icon} name="listOrdered" size="sm" /> 목차</div>
         ${chapters.map((c, i) => html`<button class=${`toc-i ${i === chap ? 'on' : ''}`} onClick=${() => goTo(c.t)}><span class="num">${fmtDur(c.t)}</span><span>${c.title}</span></button>`)}</div>`}
       ${l.summary && html`<${Study} sm=${l.summary} />`}
@@ -373,7 +404,7 @@ export function Stamp({ text = '완료', small }) {
     <path d="M50 15c19 .3 35 15.5 34.6 35.2C84.2 69.6 69.3 85 49.8 84.8 30.3 84.6 15.4 69.3 15.6 49.8 15.8 30.5 30.8 14.7 50 15Z" /></svg><b>${text}</b></div>`;
 }
 
-// AI 요약·확인 문제
+// AI 요약과 스스로 풀어 보기 (점수를 남기지 않는 짧은 문제)
 function Study({ sm }) {
   const [pick, setPick] = useState({});
   const quiz = sm.quiz || [];
@@ -382,7 +413,7 @@ function Study({ sm }) {
     ${sm.one_line && html`<p class="one">${sm.one_line}</p>`}
     ${(sm.points || []).length > 0 && html`<ul class="pts">${sm.points.map((x) => html`<li>${x}</li>`)}</ul>`}
     ${(sm.vocab || []).length > 0 && html`<div class="voc">${sm.vocab.map((v) => html`<span><b>${v.en}</b> ${v.ko}</span>`)}</div>`}
-    ${quiz.length > 0 && html`<div class="label" style="margin:16px 0 8px"><${Icon} name="circleHelp" size="sm" /> 확인 문제</div>
+    ${quiz.length > 0 && html`<div class="label" style="margin:16px 0 8px"><${Icon} name="circleHelp" size="sm" /> 스스로 풀어 보기</div>
       ${quiz.map((qz, i) => {
         const p = pick[i];
         return html`<div class="qz"><div class="qq"><b class="num">${i + 1}</b>${qz.q}</div>

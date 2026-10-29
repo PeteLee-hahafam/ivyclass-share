@@ -11,6 +11,7 @@ const ICON = {
   memo: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
   flow: '<rect x="3" y="3" width="6" height="6" rx="1.5"/><rect x="15" y="15" width="6" height="6" rx="1.5"/><path d="M9 6h4a2 2 0 0 1 2 2v7"/><path d="m12 12 3 3 3-3"/>',
   voc: '<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>',
+  exam: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
 };
 // 판서 펜 (끝이 그리는 자리에 와요). 색은 --pen-c
 const PEN_SVG = `<svg viewBox="0 0 90 120" width="90" height="120" aria-hidden="true"><g transform="rotate(32 8 112)">
@@ -30,33 +31,73 @@ export function cleanSay(text) {
     .trim();
 }
 
-export const VIEW_LABEL = { intro: '인사', summary: '내용 정리', sentence: '문장', flow: '글의 흐름', memo: '메모', vocab: '핵심 어휘', review: '마무리' };
+export const VIEW_LABEL = { intro: '인사', summary: '내용 정리', sentence: '문장', flow: '글의 흐름', memo: '메모', vocab: '핵심 어휘', exam: '변형 포인트', review: '마무리' };
 
 // ------------------------------------------------------------ 판서 스타일 (설정 → 판서 스타일)
+// 규칙 버전 2: 괄호 안은 사선만, 문장 뒤 분사구문, 의문문, 도치. 버전 3: 수식어 괄호.
+// 버전 4: 해석 기준, 동그라미는 동사만(조동사·사이 부사까지 한 덩어리), 접속부사·문두 전명구 괄호, 병렬 세모, 긴 주어 뒤 사선, 소제목 (서버 util.js 와 같아야 해요)
+const RULES_ADDED = {
+  2: [
+    "- 괄호 안에는 밑줄·동그라미 같은 표시 없이 사선만 쓴다. 사선은 긴 명사절·형용사절·부사절에서만, 절의 주어+동사(또는 주어+동사+목적어)까지 읽은 뒤 수식어가 시작되는 곳처럼 자연스럽게 쉬어 읽는 곳에만 긋는다",
+    "- 문장 뒤에 나오는 분사구문은 괄호로 묶지 않고 분사를 동사처럼 동그라미. 앞 문장에 이어 '그리고' 또는 '그래서'를 붙여 해석한다",
+    "- 의문문은 의문사를 괄호, 앞에 나오는 be동사·조동사는 주어와 함께 밑줄(주어가 길면 괄호)로 주어임을 분명히 하고 '은/는/이/가'를 붙여 해석한다. 주어 뒤에 오는 말은 품사와 상관없이 동사처럼 동그라미 치고 '~니?/~까?'를 붙여 해석한다",
+    "- 도치 구문은 맨 앞으로 나온 말을 괄호, 나머지는 의문문처럼 앞의 be동사·조동사와 주어를 함께 밑줄, 주어 뒤에 오는 말은 동사처럼 동그라미",
+  ],
+  3: ["- 부사, 전치사구 같은 수식어는 괄호. 이어서 나오는 수식어는 통으로 한 괄호 (예: (all night), (quietly on the bench))"],
+  4: [
+    "- 판서는 해석 기준: 읽고 해석하는 덩어리대로 표시한다",
+    "- 동그라미는 동사(해석할 때 '~다', '~니?'가 붙는 말)에만 친다. 접속부사(however, therefore 등)는 괄호",
+    "- 주절의 주어가 길면 주어가 끝나고 동사가 시작되는 곳, 읽을 때 쉬는 곳에 사선",
+    "- 소제목은 문장에 붙어 있어도 떼어서 그 문단 위에 따로 쓴다",
+  ],
+};
+export const RULES_V = 4;
+const VERB_RULE = "- 동사는 조동사와 사이에 낀 부사까지 한 동그라미 (예: will also search). 현재완료·과거완료도 have, has, had부터 p.p.까지 한 동그라미 (예: has already finished). 시제와 태(수동태)도 해석 기준으로 함께 묶는다";
+const FRONT_RULE = "- 문장 맨 앞에 나오는 부사는 단어·구·절 모두 괄호. For example, In addition 같은 전명구도 부사구라서 통째로 괄호";
+const CONJ_RULE = "- 등위접속사는 문장과 문장을 이을 때 세모. 뒤에 주어 없이 동사가 와서 병렬로 이어질 때도 세모";
 export const BASE_RULES = [
+  RULES_ADDED[4][0],
   "- 주어·목적어·목적격 보어는 밑줄",
-  "- 동사는 시제와 태(조동사·수동태 포함)까지 해석 기준으로 동그라미",
+  VERB_RULE,
   "- 2형식은 해석 기준('~다')이라 보어가 3단어까지면 동사와 보어를 함께 동그라미, 3단어가 넘으면 동사는 동그라미, 보어는 괄호",
   "- 주어·목적어는 3단어 이상이면 구로 보고 괄호",
   "- 동명사구, to부정사구, 분사구는 괄호",
-  "- 문장 맨 앞에 나오는 부사는 단어·구·절 모두 괄호",
+  FRONT_RULE,
   "- that절, what절, whether절, if절, 복합관계대명사절 같은 명사절은 모두 괄호",
-  "- 등위접속사는 문장과 문장을 이을 때만 세모",
+  CONJ_RULE,
+  ...RULES_ADDED[2],
+  ...RULES_ADDED[3],
+  ...RULES_ADDED[4].slice(1),
 ].join('\n');
 // 예전 기본 규칙 줄을 새 규칙으로 바꿔요 (선생님이 손댄 다른 줄은 그대로)
 const OLD_RULE_LINES = [
   ["- 주어·목적어·보어는 밑줄", "- 주어·목적어·목적격 보어는 밑줄"],
   ["- 2형식은 '~다'로 해석하니까 동사와 보어를 함께 동그라미. 단, 보어가 3단어 이상이면 동사는 동그라미, 보어는 따로 표시", "- 2형식은 해석 기준('~다')이라 보어가 3단어까지면 동사와 보어를 함께 동그라미, 3단어가 넘으면 동사는 동그라미, 보어는 괄호"],
   ["- 주어·목적어·보어라도 3단어 이상이면 구로 보고 괄호", "- 주어·목적어는 3단어 이상이면 구로 보고 괄호"],
+  ["- 끊어 읽기 사선(/)은 긴 명사절·형용사절·부사절의 괄호 안에서만 쓴다. 의미 단위마다 끊지 말고, 절의 주어+동사(또는 주어+동사+목적어)까지 읽은 뒤 수식어가 시작되는 곳처럼 자연스럽게 쉬어 읽는 곳에만 긋는다", "- 괄호 안에는 밑줄·동그라미 같은 표시 없이 사선만 쓴다. 사선은 긴 명사절·형용사절·부사절에서만, 절의 주어+동사(또는 주어+동사+목적어)까지 읽은 뒤 수식어가 시작되는 곳처럼 자연스럽게 쉬어 읽는 곳에만 긋는다"],
+  ["- 동사는 시제와 태(조동사·수동태 포함)까지 해석 기준으로 동그라미", VERB_RULE],
+  ["- 문장 맨 앞에 나오는 부사는 단어·구·절 모두 괄호", FRONT_RULE],
+  ["- 등위접속사는 문장과 문장을 이을 때만 세모", CONJ_RULE],
+  ["- 의문문은 의문사를 괄호, be동사·조동사 뒤의 주어는 밑줄(길면 괄호)로 주어임을 분명히 하고 '은/는/이/가'를 붙여 해석한다. 주어 뒤에 오는 말은 품사와 상관없이 동사처럼 동그라미 치고 '~니?/~까?'를 붙여 해석한다", RULES_ADDED[2][2]],
+  ["- 도치 구문은 맨 앞으로 나온 말을 괄호, 나머지는 의문문처럼 주어는 밑줄, 주어 뒤에 오는 말은 동사처럼 동그라미", RULES_ADDED[2][3]],
 ];
-export function migrateRules(text) {
-  return String(text)
+// v: 규칙을 저장할 때의 규칙 버전. 그 뒤에 새로 생긴 기본 규칙은 한 번만 더해요(선생님이 지운 줄은 다시 넣지 않아요)
+export function migrateRules(text, v) {
+  const lines = String(text)
     .split('\n')
     .map((line) => {
       const hit = OLD_RULE_LINES.find(([a]) => line.trim() === a);
       return hit ? hit[1] : line;
-    })
-    .join('\n');
+    });
+  const from = Number(v) || 1;
+  for (const [ver, add] of Object.entries(RULES_ADDED)) {
+    if (from >= Number(ver)) continue;
+    const missing = add.filter((a) => !lines.some((l) => l.trim() === a));
+    if (!missing.length) continue;
+    while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+    lines.push(...missing);
+  }
+  return lines.join('\n');
 }
 export const DEFAULT_STYLE = {
   hand: 'gaegu', // gaegu(둥근 손글씨) | pen(펜 손글씨) | print(정자체)
@@ -71,6 +112,7 @@ export const DEFAULT_STYLE = {
   ko: 'always', // always(처음부터) | step(설명할 때 나타나기)
   colors: { subject: '#2457d6', verb: '#e0362c', modifier: '#179c55', connector: '#e5860b', note: '#e0362c', highlight: '#ffe27a', accent: '#1f2d5c' },
   rules: BASE_RULES,
+  rules_v: RULES_V,
 };
 export const STYLE_PRESETS = {
   base: { label: '기본 판서', style: {} },
@@ -105,7 +147,8 @@ export function normalizeStyle(input) {
     fill: x.fill === undefined ? D.fill : x.fill !== false,
     ko: pick(x.ko, ['always', 'step'], D.ko),
     colors,
-    rules: x.rules === undefined || x.rules === null ? D.rules : migrateRules(x.rules),
+    rules: x.rules === undefined || x.rules === null ? D.rules : migrateRules(x.rules, x.rules_v),
+    rules_v: RULES_V,
   };
 }
 function rgba(hex, a) {
@@ -113,34 +156,178 @@ function rgba(hex, a) {
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
 }
 
-// ------------------------------------------------------------ 2형식: 동사와 보어 한 동그라미
-// 동사(V) 바로 뒤 주격 보어(C)가 3단어까지면 동사와 보어를 한 동그라미로 묶어요 ('~다'로 해석하니까).
-// 3단어가 넘으면 묶지 않고, 보어는 괄호가 돼요. 목적격 보어(O.C)나 사이에 목적어가 있으면 묶지 않아요.
+// ------------------------------------------------------------ 해석 덩어리 (판서는 해석 기준)
+// 동사는 조동사와 사이에 낀 부사까지 한 동그라미: will (also) search → will also search
+// 의문문·도치에서 앞으로 나온 be동사·조동사는 주어와 함께 밑줄: Did + the students → Did the students
+const AUX = new Set([
+  'will', 'would', 'shall', 'should', 'can', 'could', 'may', 'might', 'must', 'do', 'does', 'did', 'have', 'has', 'had', 'having',
+  'am', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'cannot', "won't", "wouldn't", "shan't", "shouldn't", "can't", "couldn't",
+  "mightn't", "mustn't", "don't", "doesn't", "didn't", "haven't", "hasn't", "hadn't", "isn't", "aren't", "wasn't", "weren't",
+]);
+const MID_ADV = new Set(['not', 'never', 'also', 'always', 'still', 'even', 'just', 'already', 'often', 'sometimes', 'usually', 'ever', 'only', 'soon', 'now', 'then', 'once', 'yet', 'further', 'almost', 'nearly', 'rather', 'quite', 'all', 'both', 'each', 'no', 'longer']);
 const SC_LAB = /^(C|S\.?C)'?$/;
 const CORE_LAB = /^(S|O|C|O\.?C|S\.?C|I\.?O|D\.?O|가S|진S|가O|진O)'?$/;
 const wordsOf = (t) => String(t || '').trim().split(/\s+/).filter(Boolean).length;
+const lowW = (w) => String(w || '').toLowerCase().replace(/[’‘]/g, "'").replace(/[^a-z']/g, '');
+const labOf = (m) => String(m.label || '').trim();
+const isVerbLab = (m) => /^V/.test(labOf(m));
+// 주어 표시 (S, '동명사구 S' 같은 이름표. 의문사 주어는 빼요)
+const isSubj = (m) => (labOf(m) === 'S' || /\sS$/.test(labOf(m))) && !/의문사/.test(labOf(m));
+// 앞 단어 하나 (쉼표 같은 문장부호는 넘지 않아요)
+function wordBefore(text, pos) {
+  const m = /([A-Za-z’']+)\s+$/.exec(text.slice(0, pos));
+  return m ? { w: m[1], s: m.index, e: m.index + m[1].length } : null;
+}
+// 표시가 실제로 덮는 글자 (조동사까지 넓힌 범위 기준)
+const rangeText = (s, m) => (m._on === 'ko' ? s.ko : s.en).slice(m._r.s, m._r.e);
+// 주어·목적어 길이: 의문문에서 주어와 함께 묶은 앞 조동사는 세지 않아요
+function coreWords(s, m) {
+  const ws = rangeText(s, m).trim().split(/\s+/).filter(Boolean);
+  return ws.length > 1 && isSubj(m) && AUX.has(lowW(ws[0])) ? ws.length - 1 : ws.length;
+}
+// 표시 범위를 해석 덩어리에 맞게 넓혀요. 다른 표시에 합쳐진 표시 id 를 돌려줘요 (그리지 않아요)
+// 현재완료·과거완료도 have/has/had 부터 p.p. 까지 한 덩어리 (has already finished, had been waiting)
+export function joinChunks(s) {
+  const merged = new Set();
+  const en = s.marks.filter((m) => m._on !== 'ko' && m._r);
+  const question = /\?["”’)\]]*\s*$/.test(s.en);
+  const fronted = en.some((x) => /도치|의문사/.test(labOf(x)));
+  const isVerbMark = (m) => isVerbLab(m) && ['under', 'circle'].includes(m.type || 'under');
+  const coverOf = (t, self) => en.find((x) => x !== self && !merged.has(x.id) && ['under', 'circle', 'box', 'triangle'].includes(x.type || 'under') && x._r.s < t.e && t.s < x._r.e);
+  const advBox = (x) => x.type === 'box' && (!labOf(x) || /부사|수식어/.test(labOf(x))) && wordsOf(rangeText(s, x)) <= 3;
+  for (const v of en) {
+    if (!isVerbMark(v) || merged.has(v.id)) continue;
+    let pos = v._r.s;
+    let start = null;
+    let advFrom = null;
+    const eat = [];
+    for (let k = 0; k < 6; k++) {
+      const t = wordBefore(s.en, pos);
+      if (!t) break;
+      const other = coverOf(t, v);
+      if (other && isVerbMark(other) && AUX.has(lowW(rangeText(s, other).trim().split(/\s+/).pop()))) {
+        // 조동사만 따로 동사로 표시한 경우: 하나로 합쳐요
+        eat.push(other);
+        start = other._r.s;
+        pos = other._r.s;
+        continue;
+      }
+      if (other && !advBox(other)) {
+        // 의문문·도치에서 주어 바로 뒤 부사는 동사 덩어리에 넣어요: Have you (ever) seen → ever seen
+        if (start === null && advFrom !== null && (question || fronted) && isSubj(other)) start = advFrom;
+        break;
+      }
+      if (!other && AUX.has(lowW(t.w))) {
+        start = t.s;
+        pos = t.s;
+        continue;
+      }
+      if (other || MID_ADV.has(lowW(t.w)) || /^[a-z]+ly$/.test(lowW(t.w))) {
+        pos = other ? Math.min(t.s, other._r.s) : t.s;
+        advFrom = pos;
+        continue;
+      }
+      break;
+    }
+    if (start !== null && start < v._r.s) {
+      v._r = { s: start, e: v._r.e };
+      for (const x of eat) merged.add(x.id);
+    }
+  }
+  // 의문문·도치: 주어 바로 앞에 남은 be동사·조동사는 주어 밑줄에 넣어요
+  for (const m of en) {
+    if (!isSubj(m) || !['under', 'box'].includes(m.type || 'under') || merged.has(m.id)) continue;
+    const t = wordBefore(s.en, m._r.s);
+    if (!t || !AUX.has(lowW(t.w)) || coverOf(t, m)) continue;
+    const first = !/[A-Za-z]/.test(s.en.slice(0, t.s));
+    if (question || fronted || first) m._r = { s: t.s, e: m._r.e };
+  }
+  return merged;
+}
+
+// ------------------------------------------------------------ 2형식: 동사와 보어 한 동그라미
+// 동사(V) 바로 뒤 주격 보어(C)가 3단어까지면 동사와 보어를 한 동그라미로 묶어요 ('~다'로 해석하니까).
+// 3단어가 넘으면 묶지 않고, 보어는 괄호가 돼요. 목적격 보어(O.C)나 사이에 목적어가 있으면 묶지 않아요.
 export function scPairs(s, style) {
   const pairOf = new Map(); // 동사 id -> 동그라미 범위
   const inPair = new Set(); // 동그라미에 들어간 보어 id
   if (!style.sc_circle || style.verb_mark !== 'circle') return { pairOf, inPair };
-  const lab = (x) => String(x.label || '').trim();
   const kind = (x) => x.type || 'under';
-  const en = s.marks.filter((x) => x._on !== 'ko' && x._r && (kind(x) === 'under' || kind(x) === 'circle'));
+  const en = s.marks.filter((x) => x._on !== 'ko' && x._r && (kind(x) === 'under' || kind(x) === 'circle') && !(s._merged && s._merged.has(x.id)));
   for (const v of en) {
-    if (!/^V'?$/.test(lab(v))) continue;
+    if (!/^V'?$/.test(labOf(v))) continue;
     let c = null;
     for (const x of en) {
-      if (x === v || kind(x) !== 'under' || inPair.has(x.id) || !SC_LAB.test(lab(x)) || x._r.s < v._r.e) continue;
+      if (x === v || kind(x) !== 'under' || inPair.has(x.id) || !SC_LAB.test(labOf(x)) || x._r.s < v._r.e) continue;
       if (!c || x._r.s < c._r.s) c = x;
     }
-    if (!c || wordsOf(c.text) > 3) continue;
+    if (!c || wordsOf(rangeText(s, c)) > 3) continue;
     const gap = s.en.slice(v._r.e, c._r.s);
     if (wordsOf(gap) > 2 || /[,;:.!?"“”()]/.test(gap)) continue;
-    if (en.some((x) => x !== v && x !== c && x._r.s < c._r.s && x._r.e > v._r.e && CORE_LAB.test(lab(x)))) continue;
+    if (en.some((x) => x !== v && x !== c && x._r.s < c._r.s && x._r.e > v._r.e && CORE_LAB.test(labOf(x)))) continue;
     pairOf.set(v.id, { s: v._r.s, e: c._r.e });
     inPair.add(c.id);
   }
   return { pairOf, inPair };
+}
+
+// 동그라미는 동사에만: 동사가 아닌데 동그라미로 온 표시(접속부사·신호어 등)는 괄호로 그려요
+function kindOf(m, style) {
+  const k = m.type || 'under';
+  if (k === 'circle' && m._on !== 'ko' && style.verb_mark === 'circle' && !isVerbLab(m)) return 'box';
+  return k;
+}
+const isVerbCircle = (m, style) => m._on !== 'ko' && isVerbLab(m) && ((m.type || 'under') === 'circle' || ((m.type || 'under') === 'under' && style.verb_mark === 'circle'));
+
+// 괄호 안에서는 사선만: 괄호(box, 또는 길어서 괄호가 되는 주어·목적어) 안에 들어간 밑줄·동그라미·괄호·세모는 그리지 않고,
+// 사선은 괄호 안에 있을 때와 긴 주어 뒤에만 그려요. 메모·형광펜·화살표는 괄호 안에서도 그려요.
+const INNER_HIDE = new Set(['under', 'circle', 'box', 'triangle']);
+function parenRules(s, style) {
+  const { inPair } = scPairs(s, style);
+  const merged = s._merged || new Set();
+  const parens = s.marks.filter((x) => {
+    if (x._on === 'ko' || !x._r || inPair.has(x.id) || merged.has(x.id)) return false;
+    const k = kindOf(x, style);
+    const lb = labOf(x);
+    return k === 'box' || (k === 'under' && CORE_LAB.test(lb) && style.long_paren && coreWords(s, x) >= (SC_LAB.test(lb) && style.sc_circle ? 4 : 3));
+  });
+  const len = (x) => x._r.e - x._r.s;
+  const hidden = new Set(merged);
+  for (const m of s.marks) {
+    if (m._on === 'ko' || !m._r || !INNER_HIDE.has(kindOf(m, style))) continue;
+    if (parens.some((x) => x !== m && x._r.s <= m._r.s && m._r.e <= x._r.e && len(x) > len(m))) hidden.add(m.id);
+  }
+  // 동사 동그라미(조동사·사이 부사까지) 안의 괄호·밑줄은 그리지 않아요: will (also) search → 한 동그라미
+  const verbs = s.marks.filter((m) => m._r && !hidden.has(m.id) && isVerbCircle(m, style));
+  for (const m of s.marks) {
+    if (m._on === 'ko' || !m._r || hidden.has(m.id) || isVerbCircle(m, style) || !INNER_HIDE.has(kindOf(m, style))) continue;
+    if (verbs.some((v) => v._r.s <= m._r.s && m._r.e <= v._r.e)) hidden.add(m.id);
+  }
+  const open = parens.filter((x) => !hidden.has(x.id));
+  const slashes = new Set(s.marks.filter((m) => m.type === 'slash' && m._on !== 'ko' && m._r && open.some((x) => x._r.s < m._r.s && m._r.s < x._r.e)).map((m) => m.id));
+  // 긴 주어 뒤 사선 (읽을 때 쉬는 곳): 괄호 밖이라도, 주절 주어부터 사선까지 5단어 이상이고
+  // 사선 바로 뒤에 동사가 오면(사이 부사 2단어까지) 그려요
+  const subjSlash = new Set();
+  const live = s.marks.filter((m) => m._on !== 'ko' && m._r && !hidden.has(m.id));
+  for (const m of s.marks) {
+    if (m.type !== 'slash' || m._on === 'ko' || !m._r || slashes.has(m.id)) continue;
+    const p = m._r.s;
+    const subj = live.filter((x) => isSubj(x) && x._r.s < p).sort((a, b) => b._r.s - a._r.s)[0];
+    if (!subj || subj._r.e > p) continue;
+    const verb = live.filter((x) => isVerbLab(x) && !labOf(x).includes("'") && x._r.s >= p).sort((a, b) => a._r.s - b._r.s)[0];
+    if (!verb || live.some((x) => isVerbLab(x) && x._r.s >= subj._r.s && x._r.s < p)) continue;
+    if (wordsOf(s.en.slice(subj._r.s, p)) < 5 || wordsOf(s.en.slice(p, verb._r.s)) > 2) continue;
+    slashes.add(m.id);
+    subjSlash.add(m.id);
+  }
+  // 테두리가 있는 표시(괄호, 동그라미)의 범위: 바로 붙어 있으면 조금 띄워요
+  const { pairOf } = scPairs(s, style);
+  const rims = open.map((x) => x._r);
+  for (const m of s.marks) {
+    if (m._on === 'ko' || !m._r || hidden.has(m.id) || inPair.has(m.id) || open.includes(m)) continue;
+    if (kindOf(m, style) === 'circle' || isVerbCircle(m, style)) rims.push(pairOf.get(m.id) || m._r);
+  }
+  return { hidden, slashes, subjSlash, open, rims };
 }
 
 // ------------------------------------------------------------ 데이터 다듬기
@@ -152,6 +339,8 @@ export function normalizeScript(input) {
     n: Number(x.n) || i + 1,
     en: clean(x.en),
     ko: clean(x.ko),
+    // 소제목: 이 문장 위에 따로 써요 (지문에 붙어 있던 제목)
+    ...(clean(x.heading) ? { heading: clean(x.heading) } : {}),
     marks: (x.marks || []).filter(Boolean).map((m) => ({ ...m, id: String(m.id || `auto${++auto}`) })),
   }));
   const items = (arr, f) => (arr || []).filter(Boolean).map((x, i) => ({ ...f(x), id: String(x.id || `${f.name}${i + 1}`) }));
@@ -161,7 +350,13 @@ export function normalizeScript(input) {
     sentences,
     summary: items(s.summary, function sum(x) { return { k: clean(x.k), v: clean(x.v) }; }),
     memo: items(s.memo, function memo(x) { return { text: clean(x.text), tone: x.tone || 'red' }; }),
-    vocab: items(s.vocab, function voc(x) { return { en: clean(x.en), ko: clean(x.ko) }; }),
+    // 단어: 유의어(syn)와 반의어(ant)는 1.4.0 엔진부터 (예전 대본에는 없어요)
+    vocab: items(s.vocab, function voc(x) {
+      const words = (v) => (Array.isArray(v) ? v.map(clean).filter(Boolean).slice(0, 3) : []);
+      return { en: clean(x.en), ko: clean(x.ko), syn: words(x.syn), ant: words(x.ant) };
+    }),
+    // 변형 포인트: 이 지문이 시험에서 어떻게 변형돼 나올지 (1.4.0 엔진부터)
+    exam: items(s.exam, function exam(x) { return { k: clean(x.k), text: clean(x.text), n: clean(x.n) }; }),
     flow: items(s.flow, function flow(x) { return { k: clean(x.k), text: clean(x.text), n: clean(x.n), hot: !!x.hot }; }),
     steps: (s.steps || []).filter(Boolean).map((st) => ({ ...st, view: st.view || 'sentence', say: String(st.say || ''), show: (st.show || []).map(String) })),
   };
@@ -236,6 +431,62 @@ function el(tag, attrs = {}, parent) {
   }
   if (parent) parent.appendChild(e);
   return e;
+}
+// 로고 둘레의 빈 여백(투명하거나 흰 곳)을 잘라 내요. 워터마크 크기가 로고 그림 자체의 크기가 되게요.
+async function trimLogo(src) {
+  try {
+    const img = new Image();
+    img.src = src;
+    await img.decode();
+    const k = Math.min(1, 1200 / Math.max(img.naturalWidth, img.naturalHeight, 1));
+    const w = Math.max(1, Math.round(img.naturalWidth * k));
+    const h = Math.max(1, Math.round(img.naturalHeight * k));
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    const g = c.getContext('2d', { willReadFrequently: true });
+    g.drawImage(img, 0, 0, w, h);
+    const d = g.getImageData(0, 0, w, h).data;
+    let x0 = w, y0 = h, x1 = -1, y1 = -1;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        if (d[i + 3] > 16 && !(d[i] > 244 && d[i + 1] > 244 && d[i + 2] > 244)) {
+          if (x < x0) x0 = x;
+          if (x > x1) x1 = x;
+          if (y < y0) y0 = y;
+          if (y > y1) y1 = y;
+        }
+      }
+    }
+    if (x1 < 0 || (x1 - x0 + 1 > w * 0.97 && y1 - y0 + 1 > h * 0.97)) return src;
+    const out = document.createElement('canvas');
+    out.width = x1 - x0 + 1;
+    out.height = y1 - y0 + 1;
+    out.getContext('2d').drawImage(c, x0, y0, out.width, out.height, 0, 0, out.width, out.height);
+    return out.toDataURL('image/png');
+  } catch {
+    return src; // 그림을 못 읽으면(다른 주소의 그림 등) 그대로 써요
+  }
+}
+function showLogo(img, src) {
+  return trimLogo(src).then((s) => {
+    img.src = s;
+    return img.decode();
+  });
+}
+
+// PDF 워터마크: 쪽마다 A4 정중앙에, 한 변이 A4 세로의 절반(148.5mm)인 정사각형으로 흐리게 찍어요.
+// scale 은 엔진이 PDF를 줄여 찍는 비율(판서노트 0.44)이라 그만큼 키워 두면 종이에서 148.5mm가 돼요.
+export function printWatermark(src, scale = 1) {
+  const old = document.getElementById('bd-pwater');
+  if (old) old.remove();
+  if (!src) return { el: null, ready: Promise.resolve() };
+  const box = el('div', { id: 'bd-pwater', class: 'bd-pwater', 'aria-hidden': 'true' }, document.body);
+  box.style.setProperty('--bd-wm', `${(148.5 / (Number(scale) > 0 ? Number(scale) : 1)).toFixed(2)}mm`);
+  const img = el('img', { alt: '' }, box);
+  const ready = Promise.race([showLogo(img, src).catch(() => box.remove()), new Promise((r) => setTimeout(r, 4000))]);
+  return { el: box, ready };
 }
 function sv(tag, attrs = {}, parent) {
   const e = document.createElementNS(SVGNS, tag);
@@ -317,6 +568,7 @@ export function mountBoard(host, input, opts = {}) {
   const lines = []; // { sent, which, spans, body }
   for (const s of script.sentences) {
     const blk = el('div', { class: 'bd-sent', 'data-n': s.n }, paper);
+    if (s.heading) el('div', { class: 'bd-subhead', lang: 'en', text: s.heading }, blk);
     el('div', { class: 'bd-no', text: String(s.n) }, blk);
     const body = el('div', { class: 'bd-body' }, blk);
     const back = sv('svg', { class: 'bd-svg back' }, body);
@@ -329,16 +581,60 @@ export function mountBoard(host, input, opts = {}) {
       const text = on === 'ko' ? s.ko : s.en;
       m._r = resolveRange(text, m.text, m.occ);
       m._on = on;
-      if (m._r) ranges[on].push(m._r);
-      else problems.push({ n: s.n, id: m.id, text: m.text, why: '문장에서 찾지 못했어요' });
+      if (!m._r) problems.push({ n: s.n, id: m.id, text: m.text, why: '문장에서 찾지 못했어요' });
       if (m.type === 'arrow') {
         m._r2 = resolveRange(text, m.to, m.to_occ);
-        if (m._r2) ranges[on].push(m._r2);
-        else problems.push({ n: s.n, id: m.id, text: m.to, why: '화살표 끝을 찾지 못했어요' });
+        if (!m._r2) problems.push({ n: s.n, id: m.id, text: m.to, why: '화살표 끝을 찾지 못했어요' });
       }
+    }
+    // 해석 덩어리: 조동사·사이 부사까지 한 동그라미, 의문문의 앞 조동사는 주어와 함께
+    s._merged = joinChunks(s);
+    for (const m of s.marks) {
+      if (m._r) ranges[m._on].push(m._r);
+      if (m._r2) ranges[m._on].push(m._r2);
     }
     const enSpans = fillTokens(en, s.en, ranges.en);
     const koSpans = fillTokens(ko, s.ko, ranges.ko);
+    // 사선 자리는 조금 띄워서 괄호와 겹치지 않게 해요
+    const pr = parenRules(s, style);
+    s._slash = pr.slashes;
+    s._subjSlash = pr.subjSlash;
+    s._hide = pr.hidden;
+    // 닫는 괄호·동그라미 바로 뒤에 붙은 쉼표·마침표·물음표는 조금 띄워서 테두리에 가리지 않게 해요
+    for (const r of pr.rims) {
+      if (!/[^\s]/.test(s.en.charAt(r.e))) continue;
+      const sp = enSpans.find((y) => +y.dataset.s === r.e);
+      if (sp) sp.classList.add('pn-gap');
+    }
+    // 동그라미·괄호 테두리가 앞뒤 낱말에 닿지 않게 살짝 띄워요
+    for (const r of pr.rims) {
+      const a = enSpans.find((y) => +y.dataset.s === r.s);
+      if (a && r.s > 0 && /\s/.test(s.en.charAt(r.s - 1))) a.classList.add('rm-gap');
+      const b = enSpans.find((y) => +y.dataset.s >= r.e);
+      if (b && /^\s+$/.test(s.en.slice(r.e, +b.dataset.s))) b.classList.add('rm-gap');
+    }
+    // 괄호·동그라미가 빈칸 하나(또는 쉼표 + 빈칸)를 사이에 두고 붙어 있으면 뒤쪽을 조금 띄워요
+    for (const b of pr.rims) {
+      if (!pr.rims.some((a) => a !== b && a.e <= b.s && /^[,;:]?\s+$/.test(s.en.slice(a.e, b.s)))) continue;
+      const sp = enSpans.find((y) => +y.dataset.s === b.s);
+      if (sp) sp.classList.add('mk-gap');
+    }
+    // 세모는 글자보다 넓게 그려져요: 앞뒤를 띄워 옆 괄호·동그라미와 겹치지 않게 해요
+    if (style.conj_mark === 'triangle') {
+      for (const m of s.marks) {
+        if (m.type !== 'triangle' || m._on === 'ko' || !m._r || s._hide.has(m.id)) continue;
+        const a = enSpans.find((y) => +y.dataset.s === m._r.s);
+        const b = enSpans.find((y) => +y.dataset.s >= m._r.e);
+        if (a) a.classList.add('tr-gap');
+        if (b) b.classList.add('tr-gap2');
+      }
+    }
+    for (const m of s.marks) {
+      if (!s._slash.has(m.id)) continue;
+      const sp = enSpans.find((x) => +x.dataset.s === m._r.s);
+      // 긴 주어 뒤 사선은 바로 뒤 동그라미·괄호와 겹치지 않게 더 띄워요
+      if (sp) sp.classList.add(s._subjSlash.has(m.id) ? 'sl-gap2' : 'sl-gap');
+    }
     sentEls.set(s.n, { blk, body, back, front, en, ko, enSpans, koSpans, s });
     if (style.ko === 'step') {
       ko.classList.add('mk-fade');
@@ -392,11 +688,30 @@ export function mountBoard(host, input, opts = {}) {
   addBox('voc', 'bd-voc', '핵심 단어·구문', script.vocab, (it, p) => {
     const r = el('div', { class: 'bd-row' }, p);
     el('span', { class: 'w', text: it.en }, r);
-    el('span', { text: it.ko }, r);
+    const m = el('span', { class: 'm' }, r);
+    el('span', { text: it.ko }, m);
+    // 유의어(=)와 반의어(↔)는 뜻 뒤에 작게
+    if (it.syn.length) el('span', { class: 'sy', text: `= ${it.syn.join(', ')}` }, m);
+    if (it.ant.length) el('span', { class: 'an', text: `↔ ${it.ant.join(', ')}` }, m);
+    return r;
+  });
+  // 유의어·반의어가 있으면 단어 상자를 한 줄에 하나씩 넓게 써요
+  if (boxEls.voc && script.vocab.some((x) => x.syn.length || x.ant.length)) {
+    const g = boxEls.voc.querySelector('.grid');
+    if (g) g.classList.add('one', 'wide');
+  }
+  // 변형 포인트: 유형 이름표, 무엇을 묻는지, 문장 번호
+  addBox('exam', 'bd-exam', '변형 포인트', script.exam, (it, p) => {
+    const r = el('div', { class: 'bd-row' }, p);
+    el('span', it.k ? { class: 'k', text: it.k } : { class: 'k0' }, r); // 유형이 없어도 자리는 지켜요
+    el('span', { class: 'tx', text: it.text }, r);
+    // 문장 번호는 글에 'N번'이 없을 때만 오른쪽에 따로 적어요
+    if (it.n && !/\d\s*번/.test(it.text)) el('span', { class: 'n', text: /^[0-9~\-–, ]+$/.test(it.n) ? `${it.n}번` : it.n }, r);
     return r;
   });
 
   let water = null;
+  let pwater = null;
   let cap = null;
   let penEl = null;
   if (mode !== 'print') {
@@ -404,9 +719,12 @@ export function mountBoard(host, input, opts = {}) {
     penEl.innerHTML = PEN_SVG;
     if (opts.logo) {
       water = el('div', { class: 'bd-water' }, view);
-      el('img', { src: opts.logo, alt: '' }, water);
+      el('img', { alt: '' }, water);
     }
     cap = el('div', { class: 'bd-cap' }, view);
+  } else if (opts.logo) {
+    pwater = printWatermark(opts.logo, opts.pageScale);
+    cleanups.push(() => pwater.el && pwater.el.remove());
   }
 
   // 미리보기는 같은 화면을 줄여서 보여 줘요
@@ -462,8 +780,9 @@ export function mountBoard(host, input, opts = {}) {
     ...script.sentences.flatMap((s) => s.marks.flatMap((m) => [m.label || '', m.note || ''])),
     ...script.summary.map((x) => `${x.k}${x.v}`),
     ...script.memo.map((x) => x.text),
-    ...script.vocab.map((x) => `${x.en}${x.ko}`),
+    ...script.vocab.map((x) => `${x.en}${x.ko}${x.syn.join('')}${x.ant.join('')}=↔`),
     ...script.flow.map((x) => `${x.k}${x.text}${x.n}`),
+    ...script.exam.map((x) => `${x.k}${x.text}${x.n}번`),
   ].join('');
 
   // 카메라(.bd-cam) 안에서의 위치
@@ -570,16 +889,18 @@ export function mountBoard(host, input, opts = {}) {
       const off = offsetIn(body, cam);
       const { pairOf, inPair } = scPairs(s, style);
       for (const m of s.marks) {
+        if (m.type === 'slash' && m._on !== 'ko' && !(s._slash && s._slash.has(m.id))) continue;
+        if (s._hide && s._hide.has(m.id)) continue;
         const spans = m._on === 'ko' ? koSpans : enSpans;
         const own = geom(spans, m._r, body);
         const pair = pairOf.get(m.id);
         const segs = pair ? geom(spans, pair, body) : own;
         if (!segs.length) continue;
-        let type = m.type || 'under';
+        let type = kindOf(m, style);
         const rawLab = String(m.label || '').trim();
         const isVerb = /^V/.test(rawLab);
         const isCore = CORE_LAB.test(rawLab);
-        const nWords = wordsOf(m.text);
+        const nWords = coreWords(s, m);
         // 선생님 판서 스타일에 맞게 모양을 바꿔요
         if (type === 'under' && isVerb && style.verb_mark === 'circle' && m._on !== 'ko') type = 'circle';
         else if (inPair.has(m.id)) type = 'label'; // 동사 동그라미 안에 들어간 보어: 이름표와 메모만
@@ -660,7 +981,8 @@ export function mountBoard(host, input, opts = {}) {
           }
         } else if (type === 'slash') {
           const g = segs[0];
-          addPath(`M${g.l - 4} ${g.t + 2}L${g.l - 14} ${g.b - 1}`, 2.6);
+          const dx = s._subjSlash && s._subjSlash.has(m.id) ? 13 : 0;
+          addPath(`M${g.l - 3 - dx} ${g.t + 1}L${g.l - 14 - dx} ${g.b}`, 2.8);
         } else if (type === 'arrow') {
           const segs2 = geom(spans, m._r2, body);
           if (segs2.length) {
@@ -706,7 +1028,9 @@ export function mountBoard(host, input, opts = {}) {
         if (noteText) {
           const g = own[0] || segs[0];
           const nc = type === 'note' ? c : m.note_color && PAL[m.note_color] ? PAL[m.note_color] : style.colors.note;
-          const tx = sv('text', { x: g.l - 2, y: g.t - 5, fill: nc, 'font-size': hand.size, 'text-anchor': 'start' }, front);
+          // 세모 위 메모는 꼭짓점 위 가운데에 써요
+          const tri = type === 'triangle';
+          const tx = sv('text', { x: tri ? (g.l + g.r) / 2 : g.l - 2, y: tri ? g.t - 25 : g.t - 5, fill: nc, 'font-size': hand.size, 'text-anchor': tri ? 'middle' : 'start' }, front);
           tx.textContent = noteText;
           addFade(tx, type === 'note' ? 0 : 0.35, 1);
           notes.push({ node: tx, line: Math.round(g.t) });
@@ -865,6 +1189,7 @@ export function mountBoard(host, input, opts = {}) {
   for (const it of script.memo) if (!revealAt.has(it.id)) revealAt.set(it.id, firstStep((st) => st.view === 'memo'));
   for (const it of script.vocab) if (!revealAt.has(it.id)) revealAt.set(it.id, firstStep((st) => st.view === 'vocab'));
   for (const it of script.flow) if (!revealAt.has(it.id)) revealAt.set(it.id, firstStep((st) => st.view === 'flow'));
+  for (const it of script.exam) if (!revealAt.has(it.id)) revealAt.set(it.id, firstStep((st) => st.view === 'exam'));
   if (style.ko === 'step') for (const s of script.sentences) revealAt.set(`ko-${s.n}`, firstStep((st) => (st.view === 'sentence' || st.view === 'review') && Number(st.n) === s.n));
 
   const allIds = () => [...new Set([...marks.keys(), ...rows.keys(), ...script.flow.map((x) => x.id)])];
@@ -988,7 +1313,7 @@ export function mountBoard(host, input, opts = {}) {
       }
       return { ...fitRect(r, 1.35), f: n };
     }
-    const key = { summary: 'sum', memo: 'memo', vocab: 'voc', flow: 'flow' }[st.view];
+    const key = { summary: 'sum', memo: 'memo', vocab: 'voc', flow: 'flow', exam: 'exam' }[st.view];
     if (key && boxEls[key]) {
       const b = boxEls[key];
       const o = offsetIn(b, cam);
@@ -1026,14 +1351,16 @@ export function mountBoard(host, input, opts = {}) {
         document.fonts.load('700 23px "Pretendard Variable"', '메모내용정리핵심단어구문'),
         document.fonts.load('500 29px "Pretendard Variable"', ko || '가'),
         document.fonts.load('800 35px "Pretendard Variable"', script.title || '가'),
+        document.fonts.load('600 32px "Noto Serif"', script.sentences.map((s) => s.heading || '').join(' ') || 'A'),
       ].map((p) => p.catch(() => null));
       await Promise.race([Promise.all(loads), new Promise((r) => setTimeout(r, 6000))]);
       await Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 2000))]);
     }
     if (water) {
       const img = water.querySelector('img');
-      await Promise.race([img.decode().catch(() => water.remove()), new Promise((r) => setTimeout(r, 4000))]);
+      await Promise.race([showLogo(img, opts.logo).catch(() => water.remove()), new Promise((r) => setTimeout(r, 4000))]);
     }
+    if (pwater) await pwater.ready;
     drawMarks();
     if (mode === 'print') resetTo(steps.length + 1);
     else resetTo(0);

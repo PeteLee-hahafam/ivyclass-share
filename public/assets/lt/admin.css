@@ -1,0 +1,151 @@
+/* 선생님 레벨테스트 화면 (반 → 레벨테스트)
+   사이트 색(칠판 스튜디오)을 그대로 쓰고, 영역별 레벨 그림 같은 리포트 부품(rp-...)은 lt/report.css 에서 가져와요. */
+.lt-admin { --band: #eef3ef; --band-line: #d6dfd8; display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; min-width: 0; }
+.lt-admin .hub-h { margin-bottom: 0; }
+.lt-admin .hub-h h1 { flex-wrap: wrap; row-gap: 6px; }
+.lt-admin .hub-h h1 .chip { letter-spacing: 0; }
+.lt-back { display: inline-flex; align-items: center; gap: 2px; font-size: 13.5px; font-weight: 650; color: var(--muted); margin: -4px 0 6px -4px; padding: 2px 4px; border-radius: 6px; }
+.lt-back:hover { color: var(--ink); background: var(--line-2); }
+.lt-note { margin: 0; font-size: 13px; color: var(--muted); }
+.lt-warn { margin: 0; font-size: 13.5px; color: var(--yellow-ink); background: var(--yellow-soft); border-radius: 10px; padding: 9px 12px; }
+
+/* 시험 링크 */
+.lt-link .panel-b { display: grid; gap: 12px; }
+.lt-open { display: inline-flex; align-items: center; gap: 10px; font-size: 13.5px; font-weight: 650; color: var(--ink-2); cursor: pointer; }
+.lt-open input { appearance: none; -webkit-appearance: none; width: 44px; height: 26px; border-radius: 99px; background: #cdd4ce; position: relative; flex-shrink: 0; cursor: pointer; transition: background 0.18s; margin: 0; }
+.lt-open input::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); transition: transform 0.18s; }
+.lt-open input:checked { background: var(--board); }
+.lt-open input:checked::after { transform: translateX(18px); }
+.lt-open input:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+.lt-pick { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.lt-pick .lb { font-size: 13.5px; font-weight: 700; color: var(--ink-2); }
+.lt-mods { display: flex; gap: 8px; flex-wrap: wrap; }
+.lt-mods .pick { height: 34px; font-size: 13.5px; }
+.lt-est { margin: 0; font-size: 14px; color: var(--ink-2); }
+.lt-url { display: flex; gap: 8px; align-items: center; }
+.lt-url .input { flex: 1; min-width: 0; font-variant-numeric: tabular-nums; color: var(--ink-2); background: var(--paper); }
+.lt-more { display: flex; gap: 6px; flex-wrap: wrap; margin-top: -4px; }
+
+/* 결과 목록 */
+.lt-row { display: grid; gap: 6px; }
+.lt-r1, .lt-r2 { display: flex; align-items: center; gap: 6px 8px; flex-wrap: wrap; min-width: 0; }
+.lt-r1 b { font-size: 15.5px; }
+.lt-r2 { font-size: 13.5px; color: var(--ink-2); }
+.lt-r2 .lv { color: var(--board); font-size: 15px; }
+.lt-r2 .when { font-size: 12.5px; }
+.lt-new { width: 9px; height: 9px; border-radius: 50%; background: var(--yellow-2, #e4ad2b); box-shadow: 0 0 0 3px var(--yellow-soft); flex: none; }
+
+/* 한 학생 결과 */
+.lt-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
+.lt-main, .lt-side { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; min-width: 0; }
+.lt-side { position: sticky; top: calc(var(--bar-h) + 20px); }
+.lt-hero { --chalk: var(--ink); --chalk-2: var(--ink-2); --chalk-3: var(--muted); --board-line: var(--band-line); background: var(--band); border: 1px solid var(--band-line); border-top: 4px solid var(--board); border-radius: var(--radius); padding: 18px 20px; display: flex; flex-wrap: wrap; gap: 16px 24px; align-items: center; }
+.lt-hero .rp-hero { margin: 0; flex: 1 1 300px; min-width: 0; }
+.lt-hero .rp-hero-t { flex: 1 1 auto; min-width: 150px; }
+.lt-hero .lt-idx { flex: 1 1 320px; min-width: 0; }
+.lt-hero .rp-lv strong { color: var(--board); font-size: 50px; }
+.lt-hero .rp-cmp { background: var(--yellow); color: var(--board-deep); }
+.lt-hero .rp-cefr .faint { font-weight: 500; margin-left: 2px; }
+.lt-hero .rp-idx-note { color: var(--muted); }
+.lt-ladder .pn, .res-path .pn { display: none; }
+.lt-ladder .pw { max-width: 640px; }
+.res-path .pw { max-width: 680px; }
+.lt-admin .rp-mods { margin-bottom: 10px; }
+.lt-admin .rp-mods .tx { color: var(--ink-2); }
+.lt-tabsbox { padding-top: 4px; }
+.lt-tabsbox .tabs { margin-bottom: 16px; }
+.lt-panel { display: grid; gap: 12px; min-width: 0; }
+.lt-panel .rp-sub { margin: 0; font-size: 13.5px; color: var(--ink-2); }
+.lt-panel .rp-skills { margin-top: 4px; }
+
+/* 문항 기록 */
+.tblwrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.itemlog { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.itemlog th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 650; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.itemlog td { padding: 8px; border-bottom: 1px solid var(--line-2); vertical-align: top; }
+.itemlog td.ok { color: var(--green); font-weight: 800; }
+.itemlog td.no { color: var(--coral); font-weight: 800; }
+.itemlog .to { color: var(--green); font-weight: 650; }
+.itemlog small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.steps-log { display: grid; gap: 8px; }
+.steps-log details { border: 1px solid var(--line); border-radius: 11px; background: var(--surface); }
+.steps-log summary { cursor: pointer; list-style: none; display: flex; gap: 6px 12px; align-items: center; flex-wrap: wrap; padding: 10px 14px; font-size: 14px; }
+.steps-log summary::-webkit-details-marker { display: none; }
+.steps-log summary::before { content: ''; width: 7px; height: 7px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-45deg); transition: transform 0.15s; flex: none; }
+.steps-log details[open] summary::before { transform: rotate(45deg); }
+.steps-log .lv { font-weight: 800; }
+.steps-log .tt { font-family: var(--serif); color: var(--ink-2); }
+.steps-log .meta { color: var(--muted); font-size: 13px; }
+.steps-log .sc { margin-left: auto; font-weight: 800; font-size: 12.5px; padding: 1px 9px; border-radius: 99px; }
+.steps-log .sc.ok { background: var(--green-soft); color: var(--green); }
+.steps-log .sc.no { background: var(--coral-soft); color: var(--coral); }
+.steps-log .items { margin: 0; padding: 4px 14px 12px; list-style: none; display: grid; gap: 10px; }
+.steps-log .items li { display: grid; grid-template-columns: 22px 1fr; gap: 2px 10px; font-size: 13.5px; }
+.steps-log .mark { font-weight: 800; font-size: 15px; }
+.steps-log .mark.ok { color: var(--green); }
+.steps-log .mark.no { color: var(--coral); }
+.steps-log .iq { font-weight: 650; }
+.steps-log .ia { color: var(--ink-2); grid-column: 2; }
+.steps-log .iw { color: var(--muted); grid-column: 2; }
+.steps-log .sk { font-size: 11.5px; font-weight: 700; color: var(--slate); background: var(--slate-soft); border-radius: 5px; padding: 0 6px; margin-left: 6px; }
+
+/* 라이팅 채점 */
+.lt-write { display: grid; gap: 12px; }
+.lt-wh { margin: 0; font-size: 14px; color: var(--ink-2); }
+.lt-wh b { color: var(--ink); }
+.lt-ai { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: space-between; background: var(--slate-soft); color: var(--slate); border-radius: 12px; padding: 10px 14px; font-size: 13.5px; }
+.lt-ai b { color: var(--ink); }
+.lt-ai.bad { background: var(--coral-soft); color: var(--coral); }
+.wi { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 8px; font-size: 14px; }
+.wi .h { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.wi .h .ok { color: var(--green); font-weight: 800; }
+.wi .h .no { color: var(--coral); font-weight: 800; }
+.wi .ans { font-family: var(--serif); font-size: 16px; line-height: 1.65; background: var(--paper); border-radius: 8px; padding: 8px 11px; white-space: pre-wrap; }
+.wi .model { font-size: 13px; color: var(--muted); }
+.wi .model span[lang] { font-family: var(--serif); color: var(--ink-2); }
+.wi .chk { font-size: 12.5px; color: var(--ink-2); display: flex; gap: 10px; flex-wrap: wrap; }
+.wi .chk .ok { color: var(--green); font-weight: 700; }
+.wi .chk .no { color: var(--coral); font-weight: 700; }
+.wi .wrow { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.wi .small { font-size: 12.5px; }
+.rubgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; }
+.rubgrid label { display: grid; gap: 4px; font-size: 13px; font-weight: 700; color: var(--ink-2); }
+.wi .field { margin: 0; }
+
+/* 어머니께 보내기 */
+.lt-send .panel-b, .lt-side .panel-b { display: grid; gap: 12px; }
+.lt-side .field { margin: 0; }
+.lt-to { margin: 0; font-size: 14px; color: var(--ink-2); display: flex; gap: 6px; flex-wrap: wrap; align-items: baseline; }
+.lt-to b { color: var(--ink); }
+.lt-to a { color: var(--green); font-weight: 650; font-variant-numeric: tabular-nums; }
+.lt-books-pick { display: grid; gap: 10px; }
+.lt-row-btns { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: -4px; }
+.lt-msg-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; }
+.lt-msg { margin: 0; white-space: pre-wrap; font-family: var(--font); font-size: 13px; line-height: 1.6; background: color-mix(in srgb, #fee500 20%, var(--surface)); border: 1px solid #f2e27a; border-radius: 12px; padding: 12px 14px; color: var(--ink); user-select: text; }
+.lt-link-row { display: flex; gap: 8px; align-items: center; }
+.lt-link-row .input { flex: 1; min-width: 0; }
+
+/* 교재 목록 */
+.lt-books th, .lt-books td { padding: 6px 8px; }
+.lt-books td .input { min-height: 38px; padding: 6px 9px; }
+.lt-books td:nth-child(1) .input { min-width: 86px; }
+.lt-books td:nth-child(2) .input { min-width: 170px; }
+.lt-books td:nth-child(4) .input { min-width: 110px; }
+.lt-books .rng { white-space: nowrap; }
+.lt-books .rng .input { width: auto; display: inline-block; min-width: 70px; }
+.lt-books .rng span { margin: 0 4px; color: var(--muted); }
+
+@media (max-width: 1080px) {
+  .lt-grid { grid-template-columns: minmax(0, 1fr) 300px; }
+}
+@media (max-width: 900px) {
+  .lt-grid { grid-template-columns: minmax(0, 1fr); }
+  .lt-side { position: static; }
+}
+@media (max-width: 560px) {
+  .lt-ladder .pw, .res-path .pw { display: none; }
+  .lt-ladder .pn, .res-path .pn { display: block; }
+  .lt-url { flex-direction: column; align-items: stretch; }
+  .rubgrid { grid-template-columns: minmax(0, 1fr); }
+  .lt-hero .rp-lv strong { font-size: 44px; }
+}

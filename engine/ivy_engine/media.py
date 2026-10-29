@@ -174,6 +174,8 @@ def _anchor_of(script):
         out[x['id']] = re.sub(r'^[①-⑩0-9.\s]+', '', x.get('text', ''))[:4]
     for x in script.get('flow', []):
         out[x['id']] = x.get('k', '')
+    for x in script.get('exam', []):
+        out[x['id']] = x.get('k', '')
     return out
 
 
@@ -278,7 +280,7 @@ def build_timeline(script, audio, cams, orders, durs=None, captions=True, generi
     return {'total': t, 'segs': segs, 'pans': pans, 'caps': caps, 'revs': revs, 'slots': slots, 'starts': starts, 'cam0': dict(cams[0]) if cams else default}
 
 
-CHAPTER_LABEL = {'intro': '인사', 'summary': '내용 정리', 'flow': '글의 흐름', 'memo': '메모', 'vocab': '핵심 단어', 'review': '마무리'}
+CHAPTER_LABEL = {'intro': '인사', 'summary': '내용 정리', 'flow': '글의 흐름', 'memo': '메모', 'vocab': '핵심 단어', 'exam': '변형 포인트', 'review': '마무리'}
 
 
 def chapters_of(script, starts):
@@ -436,10 +438,14 @@ def make_thumb(page, script, out_jpg):
     return out_jpg
 
 
+NOTE_PDF_SCALE = 0.44  # 판서노트는 1700px 판서를 A4 너비에 맞게 줄여 찍어요
+
+
 def make_note_pdf(browser, origin, script, opts, out_pdf):
-    ctx, page, _ = open_board(browser, origin, script, {**opts, 'logo': None}, mode='print', width=1700, height=1200)
+    # 워터마크(로고)는 쪽마다 A4 정중앙에 148.5mm로 찍혀요. 줄여 찍는 비율을 알려 줘야 크기가 맞아요
+    ctx, page, _ = open_board(browser, origin, script, {**opts, 'pageScale': NOTE_PDF_SCALE}, mode='print', width=1700, height=1200)
     try:
-        page.pdf(path=str(out_pdf), format='A4', print_background=True, scale=0.44,
+        page.pdf(path=str(out_pdf), format='A4', print_background=True, scale=NOTE_PDF_SCALE,
                  margin={'top': '12mm', 'bottom': '12mm', 'left': '8mm', 'right': '8mm'})
     finally:
         ctx.close()

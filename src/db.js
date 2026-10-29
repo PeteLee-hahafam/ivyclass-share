@@ -2,8 +2,20 @@
 // 새 버전에서 표가 바뀌면 migrations/ 에 파일을 하나 더 두고 아래 목록에 이어 붙이면 돼요.
 // wrangler 의 d1 migrations 와 같은 기록표(d1_migrations)를 써서 둘을 섞어 써도 괜찮아요.
 import m0001 from '../migrations/0001_init.sql';
+import m0002 from '../migrations/0002_quiz.sql';
+import m0003 from '../migrations/0003_bank.sql';
+import m0004 from '../migrations/0004_leveltest.sql';
+import m0005 from '../migrations/0005_assignment_close.sql';
+import m0006 from '../migrations/0006_exams.sql';
 
-const MIGRATIONS = [['0001_init.sql', m0001]];
+const MIGRATIONS = [
+  ['0001_init.sql', m0001],
+  ['0002_quiz.sql', m0002],
+  ['0003_bank.sql', m0003],
+  ['0004_leveltest.sql', m0004],
+  ['0005_assignment_close.sql', m0005],
+  ['0006_exams.sql', m0006],
+];
 
 function statements(sql) {
   return String(sql)

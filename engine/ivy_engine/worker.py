@@ -8,7 +8,7 @@ import traceback
 from collections import deque
 from datetime import datetime
 
-from . import VERSION, config, media, scriptgen, stt, summarize, tts, updater
+from . import VERSION, bankgen, config, ltscore, media, quizgen, reader, scriptgen, stt, summarize, tts, updater
 from .cloud import Cloud, CloudError, LectureGone
 
 
@@ -256,7 +256,11 @@ class Engine:
         prog(3, 'Claude가 지문을 분석하는 중')
         academy = self.academy.get('academy_name') or '우리 학원'
         style = self.academy.get('board_style') or {}
-        script, warnings, usage = scriptgen.generate(job, self.settings, academy, on_progress=lambda p: prog(p, f'Claude가 대본을 쓰는 중 ({p}%)'), style=style, log=self.log)
+        script, warnings, usage = scriptgen.generate(job, self.settings, academy, on_progress=lambda p: prog(p, f'Claude가 대본을 쓰는 중 ({p}%)'), style=style, log=self.log,
+                                                      on_review=lambda: prog(4, 'Claude가 자료를 검토하는 중'))
+        mat = script.get('material') or {}
+        if mat:
+            self.log(f'  · 자료 검토: 소제목 {mat.get("headings", 0)}개, 뺀 문장 {len(mat.get("removed") or [])}개, 지운 군더더기 {len(mat.get("cuts") or [])}개')
         for w in warnings:
             self.log(f'  · {w}', 'warn')
         if usage is not None:
@@ -332,32 +336,46 @@ class Engine:
     def handle_task(self, c, task):
         tid, kind, lid = task['id'], task['kind'], task['lecture_id']
         title = task.get('title') or ''
-        label = {'transcribe': '자막', 'summarize': 'AI 요약'}.get(kind, kind)
+        label = {'transcribe': '자막', 'summarize': 'AI 요약', 'quiz': '확인 문제', 'bank': '문제 은행', 'read': '사진에서 지문 읽기', 'ltwrite': '레벨테스트 라이팅 채점'}.get(kind, kind)
         self.job = {'id': lid, 'title': title, 'stage': kind, 'pct': 0, 'msg': '시작했어요', 'started': time.time()}
-        self.status = f'{label} 만드는 중: {title}'
-        self.log(f'[{lid}번] {title} — {label} 만들기를 시작해요.')
+        self.status = f'레벨테스트 라이팅 채점하는 중: {title}' if kind == 'ltwrite' else f'{label} 만드는 중: {title}'
+        if kind == 'ltwrite':
+            self.log(f'{title} 레벨테스트 라이팅 채점을 시작해요.')
+        else:
+            self.log(f'[{lid}번] {title} — {label} 만들기를 시작해요.' if lid else f'{label}를 시작해요.')
 
         def prog(p, msg):
             self.job.update(pct=int(p), msg=msg)
             c.task_progress(tid, p, msg)
 
+        tag = f'[{lid}번] ' if lid else ''
         started = time.time()
         try:
             if kind == 'transcribe':
                 self.make_subtitle(c, task, prog)
             elif kind == 'summarize':
                 self.make_summary(c, task, prog)
+            elif kind == 'quiz':
+                self.make_quiz(c, task, prog)
+            elif kind == 'bank':
+                self.make_bank(c, task, prog)
+            elif kind == 'read':
+                self.read_material(c, task, prog)
+            elif kind == 'ltwrite':
+                self.score_writing(c, task, prog)
             else:
                 raise media.MediaError(f'모르는 작업이에요: {kind}')
             self.done_count += 1
-            self.log(f'[{lid}번] {label} 완성 ({int(time.time() - started)}초 걸림)')
-        except LectureGone:
-            self.log(f'[{lid}번] 작업이 취소됐어요.', 'warn')
+            self.log(f'{tag}{label} 완성 ({int(time.time() - started)}초 걸림)')
+        except LectureGone as e:
+            self.log(f'{tag}작업이 취소됐어요.', 'warn')
+            if kind == 'read':
+                c.task_fail(tid, str(e))  # 선생님이 사진을 지웠으면 기다리지 않게 실패로 알려요
         except (stt.STTError, scriptgen.ScriptError, media.MediaError, tts.TTSError, CloudError) as e:
-            self.log(f'[{lid}번] {label} 실패: {e}', 'error')
+            self.log(f'{tag}{label} 실패: {e}', 'error')
             c.task_fail(tid, str(e))
         except Exception as e:
-            self.log(f'[{lid}번] {label} 실패: {e}\n{traceback.format_exc()}', 'error')
+            self.log(f'{tag}{label} 실패: {e}\n{traceback.format_exc()}', 'error')
             c.task_fail(tid, f'제작 엔진에서 문제가 생겼어요: {e}')
         finally:
             self.job = None
@@ -392,6 +410,36 @@ class Engine:
             if not self.settings.get('keep_work'):
                 shutil.rmtree(work, ignore_errors=True)
 
+    def make_quiz(self, c, task, prog):
+        prog(5, 'Claude가 강의를 읽고 확인 문제를 만드는 중')
+        quiz = quizgen.generate(task, self.settings, self.academy.get('academy_name') or '', on_progress=prog, log=self.log)
+        n = len(quiz.get('items') or [])
+        prog(92, f'확인 문제 {n}개 올리는 중')
+        c.task_done(task['id'], quiz=quiz)
+        prog(100, '완성')
+
+    def make_bank(self, c, task, prog):
+        bank = bankgen.generate(task, self.settings, fetch_seed=c.material, on_progress=prog, log=self.log)
+        n = len(bank.get('items') or [])
+        prog(92, f'문제 {n}개를 문제 은행에 넣는 중')
+        c.task_done(task['id'], bank=bank)
+        prog(100, '완성')
+
+    def read_material(self, c, task, prog):
+        out = reader.read(task.get('files') or [], c.material, self.settings, on_progress=prog, log=self.log)
+        self.log(f'  · 지문 {len(out["passage"])}자를 읽었어요' + (f' ({out["note"]})' if out.get('note') else ''))
+        c.task_done(task['id'], read=out)
+        prog(100, '완성')
+
+    def score_writing(self, c, task, prog):
+        """레벨테스트 라이팅을 Claude로 채점해서 올려요. 선생님은 강의실에서 점수를 고칠 수 있어요."""
+        out, model = ltscore.score(task, self.settings, on_progress=prog, log=self.log)
+        n = len(out.get('items') or [])
+        e = out.get('essay')
+        self.log(f'  · 조건 영작 {n}문항' + (f', 글쓰기 {sum(e.get(k, 0) for k in ltscore.RUBRIC_KEYS)}/20점' if e else '') + '을 채점했어요')
+        c.task_done(task['id'], lt=out, model=model)
+        prog(100, '완성')
+
     def make_summary(self, c, task, prog):
         from playwright.sync_api import sync_playwright
 
@@ -403,7 +451,12 @@ class Engine:
         work.mkdir(parents=True, exist_ok=True)
         try:
             if task.get('tool') == 'manual':
-                opts = {'academy': self.academy.get('academy_name') or '', 'header': self.academy.get('header_text') or task.get('source') or '', 'style': self.academy.get('board_style') or {}}
+                opts = {
+                    'academy': self.academy.get('academy_name') or '',
+                    'header': self.academy.get('header_text') or task.get('source') or '',
+                    'logo': f'{c.origin}/media/logo' if self.academy.get('has_logo') else None,
+                    'style': self.academy.get('board_style') or {},
+                }
                 with sync_playwright() as pw:
                     browser = media.launch_browser(pw, self.settings)
                     try:
